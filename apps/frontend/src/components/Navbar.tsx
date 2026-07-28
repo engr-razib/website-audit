@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { ShieldCheck, Server, Sparkles, Activity } from "lucide-react";
-import { checkBackendHealth } from "@/lib/api";
+import { checkBackendHealth, API_BASE } from "@/lib/api";
 import { Badge } from "./ui/badge";
 
 export function Navbar() {
@@ -40,7 +40,7 @@ export function Navbar() {
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
             <Server className="h-3.5 w-3.5 text-slate-400" />
-            <span>Backend API: localhost:3000</span>
+            <span>Backend API: {API_BASE.replace('/api', '').replace('http://', '').replace('https://', '')}</span>
           </div>
 
           {status === "checking" && (

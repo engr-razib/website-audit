@@ -12,7 +12,7 @@ import { HeadingAuditTable } from "@/components/HeadingAuditTable";
 import { DownloadBar } from "@/components/DownloadBar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Type, MousePointer, Image, Heading, Code2, Zap, Globe, Sparkles } from "lucide-react";
-import { JobStatusResponse } from "@/lib/api";
+import { JobStatusResponse, getJsonDownloadUrl } from "@/lib/api";
 
 export default function AuditDashboardPage() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export default function AuditDashboardPage() {
       setJobSummary(jobData.summary);
     }
     try {
-      const res = await fetch(`http://localhost:3000/api/audit/jobs/${jobData.jobId}/download/json`);
+      const res = await fetch(getJsonDownloadUrl(jobData.jobId));
       if (res.ok) {
         const fullData = await res.json();
         setAuditData(fullData);
