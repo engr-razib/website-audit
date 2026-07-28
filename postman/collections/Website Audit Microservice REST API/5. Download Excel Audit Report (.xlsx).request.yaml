@@ -1,0 +1,5 @@
+$kind: http-request
+description: Downloads the generated 6-worksheet Excel report (.xlsx) for completed jobs.
+url: "{{baseUrl}}/api/audit/jobs/{{jobId}}/download/excel"
+method: GET
+order: 5000

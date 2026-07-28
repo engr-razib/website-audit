@@ -1,0 +1,24 @@
+$kind: http-request
+description: Triggers an asynchronous background site audit via XML sitemap. Returns jobId and status URL.
+url: "{{baseUrl}}/api/audit/full"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "sitemapUrl": "https://carbissolutions.com/page-sitemap.xml",
+      "fontName": "Dinot",
+      "maxPages": 10
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      var jsonData = pm.response.json();
+      if (jsonData && jsonData.jobId) {
+          pm.environment.set("jobId", jsonData.jobId);
+          console.log("Saved jobId to environment:", jsonData.jobId);
+      }
+    language: text/javascript
+order: 3000

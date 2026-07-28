@@ -1,0 +1,11 @@
+# Use this workspace to collaborate
+workspace:
+  id: abe12b1b-6840-46c2-8ab8-a42805326635
+
+localResources:
+  documents:
+    - ../README.md
+
+cloudResources:
+  collections:
+    ../postman/collections/Website Audit Microservice REST API: 83a9f16e-40f6-41ad-a356-13b825e31b51

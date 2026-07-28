@@ -1,0 +1,14 @@
+$kind: http-request
+description: Executes a synchronous instant audit for a single page URL. Returns full JSON payload containing fonts, CTAs, missing alt images, headings H1-H6, SEO rules, and target font rules.
+url: "{{baseUrl}}/api/audit/quick-scan"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "url": "https://carbissolutions.com",
+      "fontName": "Dinot"
+    }
+order: 2000

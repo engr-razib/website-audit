@@ -1,0 +1,5 @@
+$kind: http-request
+description: Polls status, progress percentage, current URL, and download links for a background job.
+url: "{{baseUrl}}/api/audit/jobs/{{jobId}}"
+method: GET
+order: 4000

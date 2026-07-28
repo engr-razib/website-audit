@@ -1,0 +1,6 @@
+$kind: collection
+name: Website Audit Microservice REST API
+description: Postman Collection for testing Website Audit Microservice REST API endpoints including single page quick scan, async sitemap jobs, font classification, CTA design audit, missing alt images audit, heading typography, SEO compliance, and report downloads.
+variables:
+  baseUrl: http://localhost:3000
+  jobId: ""

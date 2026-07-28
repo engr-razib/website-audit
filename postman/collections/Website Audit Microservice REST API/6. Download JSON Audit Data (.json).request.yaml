@@ -1,0 +1,5 @@
+$kind: http-request
+description: Downloads the full structured JSON audit payload for completed jobs.
+url: "{{baseUrl}}/api/audit/jobs/{{jobId}}/download/json"
+method: GET
+order: 6000

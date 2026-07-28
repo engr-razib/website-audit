@@ -1,0 +1,188 @@
+{
+  "info": {
+    "_postman_id": "c1f2e879-1122-4321-9988-776655443322",
+    "name": "Website Audit Microservice REST API",
+    "description": "Postman Collection for testing Website Audit Microservice REST API endpoints including single page quick scan, async sitemap jobs, font classification, CTA design audit, missing alt images audit, heading typography, SEO compliance, and report downloads.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        },
+        "description": "Checks microservice status, service uptime, and server health."
+      },
+      "response": []
+    },
+    {
+      "name": "2. Single Page Quick Scan",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"url\": \"https://razib.bd\",\n  \"fontName\": \"\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/audit/quick-scan",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "audit",
+            "quick-scan"
+          ]
+        },
+        "description": "Executes a synchronous instant audit for a single page URL. Returns full JSON payload containing fonts, CTAs, missing alt images, headings H1-H6, SEO rules, and target font rules."
+      },
+      "response": []
+    },
+    {
+      "name": "3. Start Full Site Audit (Async Job)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData && jsonData.jobId) {",
+              "    pm.environment.set(\"jobId\", jsonData.jobId);",
+              "    console.log(\"Saved jobId to environment:\", jsonData.jobId);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sitemapUrl\": \"https://razib.bd/sitemap.xml\",\n  \"fontName\": \"\",\n  \"maxPages\": 10\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/audit/full",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "audit",
+            "full"
+          ]
+        },
+        "description": "Triggers an asynchronous background site audit via XML sitemap. Returns jobId and status URL."
+      },
+      "response": []
+    },
+    {
+      "name": "4. Get Job Status & Progress",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/audit/jobs/{{jobId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "audit",
+            "jobs",
+            "{{jobId}}"
+          ]
+        },
+        "description": "Polls status, progress percentage, current URL, and download links for a background job."
+      },
+      "response": []
+    },
+    {
+      "name": "5. Download Excel Audit Report (.xlsx)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/audit/jobs/{{jobId}}/download/excel",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "audit",
+            "jobs",
+            "{{jobId}}",
+            "download",
+            "excel"
+          ]
+        },
+        "description": "Downloads the generated 6-worksheet Excel report (.xlsx) for completed jobs."
+      },
+      "response": []
+    },
+    {
+      "name": "6. Download JSON Audit Data (.json)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/audit/jobs/{{jobId}}/download/json",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "audit",
+            "jobs",
+            "{{jobId}}",
+            "download",
+            "json"
+          ]
+        },
+        "description": "Downloads the full structured JSON audit payload for completed jobs."
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@audit/backend",
+  "version": "1.0.0",
+  "description": "Website Audit Microservice Express REST API",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "cli": "node audit_dinot_font.js",
+    "clean:outputs": "node cleanup_outputs.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.18.1",
+    "cors": "^2.8.6",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "playwright": "^1.61.1",
+    "uuid": "^14.0.1",
+    "xml2js": "^0.6.2"
+  }
+}
