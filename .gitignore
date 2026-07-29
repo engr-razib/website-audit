@@ -3,10 +3,12 @@ node_modules/
 .pnpm-store/
 
 # Next.js build outputs
+_next/
 .next/
 out/
 build/
 dist/
+dist-cpanel/
 
 # Turborepo
 .turbo/
@@ -24,8 +26,8 @@ dinot_font_screenshots/
 *.xlsx
 
 # Environment variables
-.env
-.env*.local
+#.env
+#.env*.local
 
 # System files
 .DS_Store

@@ -53,7 +53,79 @@ async function fetchSitemapUrls(sitemapUrl) {
     return Array.from(new Set(pageUrls));
 }
 
-async function auditSinglePage(browser, url, targetFontName = "Dinot", screenshotsDir = null, ssCounter = { val: 1 }) {
+async function crawlInternalUrls(startUrl, maxPages) {
+    console.log(`[+] Crawling internal URLs starting from: ${startUrl}`);
+    let browser = null;
+    const urls = new Set();
+    urls.add(startUrl);
+
+    try {
+        browser = await chromium.launch({ headless: true, args: ['--disable-web-security'] });
+        const context = await browser.newContext({ userAgent: HEADERS['User-Agent'] });
+        const page = await context.newPage();
+
+        const startDomain = new URL(startUrl).hostname;
+        const queue = [startUrl];
+        const visited = new Set();
+
+        while (queue.length > 0 && urls.size < maxPages) {
+            const currentUrl = queue.shift();
+            if (visited.has(currentUrl)) continue;
+            visited.add(currentUrl);
+
+            try {
+                console.log(`    [-] Crawling link: ${currentUrl} (Queue size: ${queue.length}, Total found: ${urls.size})`);
+                await page.goto(currentUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+
+                const pageLinks = await page.evaluate(() => {
+                    return Array.from(document.querySelectorAll('a'))
+                        .map(a => a.href)
+                        .filter(Boolean);
+                });
+
+                for (const link of pageLinks) {
+                    try {
+                        const parsedLink = new URL(link);
+                        parsedLink.hash = '';
+                        const cleanLink = parsedLink.toString();
+
+                        if (parsedLink.hostname === startDomain) {
+                            const ignoredExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.pdf', '.css', '.js', '.xml', '.zip', '.tar', '.gz'];
+                            const cleanPath = parsedLink.pathname.toLowerCase();
+                            const isIgnored = ignoredExts.some(ext => cleanPath.endsWith(ext));
+
+                            if (!isIgnored && !urls.has(cleanLink) && !visited.has(cleanLink)) {
+                                urls.add(cleanLink);
+                                if (urls.size >= maxPages) {
+                                    break;
+                                }
+                                queue.push(cleanLink);
+                            }
+                        }
+                    } catch (e) {}
+                }
+            } catch (err) {
+                console.warn(`[!] Error crawling page ${currentUrl}: ${err.message}`);
+            }
+        }
+        await context.close();
+    } catch (err) {
+        console.error(`[!] Error during crawl:`, err);
+    } finally {
+        if (browser) await browser.close();
+    }
+
+    return Array.from(urls);
+}
+
+async function auditSinglePage(browser, url, findingType = "font", findingValue = "Dinot", screenshotsDir = null, ssCounter = { val: 1 }) {
+    let realFindingType = findingType;
+    let realFindingValue = findingValue;
+    if (findingType !== 'font' && findingType !== 'image' && findingType !== 'text' && findingType !== 'cta' && findingType !== 'all') {
+        realFindingType = 'font';
+        realFindingValue = findingType; // legacy support: 3rd param was fontName string
+    }
+
     const context = await browser.newContext({ userAgent: HEADERS['User-Agent'], viewport: { width: 1280, height: 800 } });
     const page = await context.newPage();
 
@@ -72,8 +144,8 @@ async function auditSinglePage(browser, url, targetFontName = "Dinot", screensho
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
         await page.waitForTimeout(1000);
 
-        const evaluatedData = await page.evaluate((targetFont) => {
-            const fontLower = targetFont.toLowerCase();
+        const evaluatedData = await page.evaluate(({ findingType, findingValue }) => {
+            const fontLower = (findingValue || '').toLowerCase();
 
             // -------------------------------------------------------------
             // 1. Font Families Audit
@@ -106,6 +178,13 @@ async function auditSinglePage(browser, url, targetFontName = "Dinot", screensho
                     if (cleanClasses.length > 0) selector += '.' + cleanClasses.slice(0, 2).join('.');
                 }
 
+                const relevantProps = ['font-family', 'font-size', 'font-weight', 'color', 'background-color', 'border-radius', 'padding'];
+                let cssStyles = '';
+                for (const prop of relevantProps) {
+                    const val = style.getPropertyValue(prop);
+                    if (val) cssStyles += `${prop}: ${val}; `;
+                }
+
                 ctas.push({
                     tagName: el.tagName.toLowerCase(),
                     text: text.slice(0, 80),
@@ -118,7 +197,9 @@ async function auditSinglePage(browser, url, targetFontName = "Dinot", screensho
                     borderRadius: style.borderRadius,
                     padding: style.padding,
                     boxShadow: style.boxShadow,
-                    selector
+                    selector,
+                    outerHTML: el.outerHTML.slice(0, 2000),
+                    cssStyles
                 });
             });
 
@@ -143,6 +224,16 @@ async function auditSinglePage(browser, url, targetFontName = "Dinot", screensho
                     if (classes.length > 0) selector += '.' + classes[0];
                 }
 
+                const style = window.getComputedStyle(img);
+                const relevantProps = ['width', 'height', 'object-fit', 'border', 'border-radius', 'margin', 'padding', 'display'];
+                let cssStyles = '';
+                if (style) {
+                    for (const prop of relevantProps) {
+                        const val = style.getPropertyValue(prop);
+                        if (val) cssStyles += `${prop}: ${val}; `;
+                    }
+                }
+
                 images.push({
                     src: src.slice(0, 150),
                     alt: hasAlt ? alt.trim() : '(Missing Alt Tag)',
@@ -150,7 +241,9 @@ async function auditSinglePage(browser, url, targetFontName = "Dinot", screensho
                     width: img.naturalWidth || img.width || 0,
                     height: img.naturalHeight || img.height || 0,
                     parentTag,
-                    selector
+                    selector,
+                    outerHTML: img.outerHTML.slice(0, 2000),
+                    cssStyles
                 });
             });
 
@@ -166,6 +259,13 @@ async function auditSinglePage(browser, url, targetFontName = "Dinot", screensho
                 const text = (h.innerText || h.textContent || '').trim().replace(/\s+/g, ' ');
                 if (!text) return;
 
+                const relevantProps = ['font-family', 'font-size', 'font-weight', 'color', 'line-height', 'text-transform', 'margin', 'padding'];
+                let cssStyles = '';
+                for (const prop of relevantProps) {
+                    const val = style.getPropertyValue(prop);
+                    if (val) cssStyles += `${prop}: ${val}; `;
+                }
+
                 headings.push({
                     level: h.tagName.toLowerCase(),
                     text: text.slice(0, 100),
@@ -175,7 +275,9 @@ async function auditSinglePage(browser, url, targetFontName = "Dinot", screensho
                     color: style.color,
                     lineHeight: style.lineHeight,
                     textTransform: style.textTransform,
-                    selector: h.id ? `${h.tagName.toLowerCase()}#${h.id}` : h.tagName.toLowerCase()
+                    selector: h.id ? `${h.tagName.toLowerCase()}#${h.id}` : h.tagName.toLowerCase(),
+                    outerHTML: h.outerHTML.slice(0, 2000),
+                    cssStyles
                 });
             });
 
@@ -220,74 +322,224 @@ async function auditSinglePage(browser, url, targetFontName = "Dinot", screensho
             };
 
             // -------------------------------------------------------------
-            // 6. Target Font (Dinot) Audit
+            // 6. Target Finding (Font, Image, Text, CTA, All) Audit
             // -------------------------------------------------------------
             const targetFontElems = [];
-            const candidates = document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, a, button, li, span, strong, b, em, td, th, label, input, div');
+            const findingTypeLower = (findingType || 'font').toLowerCase();
+            const findingValueLower = (findingValue || '').toLowerCase();
 
-            for (let i = 0; i < candidates.length; i++) {
-                const el = candidates[i];
-                const style = window.getComputedStyle(el);
-                if (!style || style.display === 'none' || style.visibility === 'hidden') continue;
+            const matchesSearch = (text, search) => {
+                if (!search) return true;
+                return text.toLowerCase().includes(search);
+            };
 
-                const fontFamily = style.fontFamily || '';
-                if (!fontFamily.toLowerCase().includes(fontLower)) continue;
+            const runFontFinding = () => {
+                const candidates = document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, a, button, li, span, strong, b, em, td, th, label, input, div');
+                let count = 0;
+                for (let i = 0; i < candidates.length; i++) {
+                    const el = candidates[i];
+                    const style = window.getComputedStyle(el);
+                    if (!style || style.display === 'none' || style.visibility === 'hidden') continue;
 
-                const tagName = el.tagName.toLowerCase();
-                const fullText = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
-                if (!fullText) continue;
+                    const fontFamily = style.fontFamily || '';
+                    if (!matchesSearch(fontFamily, findingValueLower)) continue;
 
-                const elementId = 'font-elem-' + targetFontElems.length;
-                el.setAttribute('data-font-audit-id', elementId);
+                    const tagName = el.tagName.toLowerCase();
+                    const fullText = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
+                    if (!fullText) continue;
 
-                targetFontElems.push({
-                    elementId,
-                    tagName,
-                    selector: tagName + (el.id ? `#${el.id}` : ''),
-                    fontFamily,
-                    fontWeight: style.fontWeight || '400',
-                    textSnippet: fullText.slice(0, 60)
+                    if (!findingValueLower) {
+                        if (count++ > 50) break;
+                    }
+
+                    const elementId = 'font-elem-' + targetFontElems.length;
+                    el.setAttribute('data-font-audit-id', elementId);
+
+                    const relevantProps = [
+                        'font-family', 'font-size', 'font-weight', 'font-style',
+                        'color', 'background-color', 'border', 'border-radius', 'padding'
+                    ];
+                    let cssStyles = '';
+                    for (const prop of relevantProps) {
+                        const val = style.getPropertyValue(prop);
+                        if (val) cssStyles += `${prop}: ${val}; `;
+                    }
+
+                    targetFontElems.push({
+                        elementId,
+                        tagName,
+                        selector: tagName + (el.id ? `#${el.id}` : '') + (el.className && typeof el.className === 'string' ? '.' + el.className.split(/\s+/).filter(Boolean).slice(0, 2).join('.') : ''),
+                        fontFamily,
+                        fontWeight: style.fontWeight || '400',
+                        textSnippet: fullText.slice(0, 60),
+                        outerHTML: el.outerHTML.slice(0, 2000),
+                        cssStyles,
+                        matchType: 'Font'
+                    });
+                }
+            };
+
+            const runImageFinding = () => {
+                const imagesList = document.querySelectorAll('img');
+                imagesList.forEach(img => {
+                    const src = img.src || img.getAttribute('data-src') || '';
+                    if (!matchesSearch(src, findingValueLower)) return;
+
+                    const elementId = 'img-elem-' + targetFontElems.length;
+                    img.setAttribute('data-font-audit-id', elementId);
+
+                    const style = window.getComputedStyle(img);
+                    const relevantProps = ['width', 'height', 'object-fit', 'border', 'border-radius', 'margin', 'padding', 'display'];
+                    let cssStyles = '';
+                    if (style) {
+                        for (const prop of relevantProps) {
+                            const val = style.getPropertyValue(prop);
+                            if (val) cssStyles += `${prop}: ${val}; `;
+                        }
+                    }
+
+                    targetFontElems.push({
+                        elementId,
+                        tagName: 'img',
+                        selector: 'img' + (img.id ? `#${img.id}` : '') + (img.className && typeof img.className === 'string' ? '.' + img.className.split(/\s+/).filter(Boolean).slice(0, 2).join('.') : ''),
+                        fontFamily: 'N/A',
+                        fontWeight: 'N/A',
+                        textSnippet: src.split('/').pop() || src,
+                        outerHTML: img.outerHTML.slice(0, 2000),
+                        cssStyles,
+                        matchType: 'Image'
+                    });
                 });
+            };
+
+            const runTextFinding = () => {
+                const allElems = document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, span, a, button, li, td, th, label, div');
+                let count = 0;
+                allElems.forEach(el => {
+                    const text = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
+                    if (matchesSearch(text, findingValueLower)) {
+                        const hasChildWithText = Array.from(el.children).some(child => matchesSearch(child.innerText || child.textContent || '', findingValueLower));
+                        if (!hasChildWithText) {
+                            if (!findingValueLower) {
+                                if (count++ > 50) return;
+                            }
+                            const elementId = 'text-elem-' + targetFontElems.length;
+                            el.setAttribute('data-font-audit-id', elementId);
+
+                            const style = window.getComputedStyle(el);
+                            const relevantProps = ['font-family', 'font-size', 'font-weight', 'color', 'background-color', 'padding', 'margin', 'display'];
+                            let cssStyles = '';
+                            if (style) {
+                                for (const prop of relevantProps) {
+                                    const val = style.getPropertyValue(prop);
+                                    if (val) cssStyles += `${prop}: ${val}; `;
+                                }
+                            }
+
+                            targetFontElems.push({
+                                elementId,
+                                tagName: el.tagName.toLowerCase(),
+                                selector: el.tagName.toLowerCase() + (el.id ? `#${el.id}` : '') + (el.className && typeof el.className === 'string' ? '.' + el.className.split(/\s+/).filter(Boolean).slice(0, 2).join('.') : ''),
+                                fontFamily: style ? style.fontFamily : 'N/A',
+                                fontWeight: style ? style.fontWeight : 'N/A',
+                                textSnippet: text.slice(0, 100),
+                                outerHTML: el.outerHTML.slice(0, 2000),
+                                cssStyles,
+                                matchType: 'Text'
+                            });
+                        }
+                    }
+                });
+            };
+
+            const runCtaFinding = () => {
+                const ctaNodes = document.querySelectorAll('button, a.btn, a.button, a.et_pb_button, input[type="submit"], input[type="button"], [role="button"], .cta');
+                ctaNodes.forEach(el => {
+                    const text = (el.innerText || el.value || el.textContent || '').trim().replace(/\s+/g, ' ');
+                    if (!matchesSearch(text, findingValueLower)) return;
+
+                    const elementId = 'cta-elem-' + targetFontElems.length;
+                    el.setAttribute('data-font-audit-id', elementId);
+
+                    const style = window.getComputedStyle(el);
+                    const relevantProps = ['font-family', 'font-size', 'font-weight', 'color', 'background-color', 'border-radius', 'padding'];
+                    let cssStyles = '';
+                    if (style) {
+                        for (const prop of relevantProps) {
+                            const val = style.getPropertyValue(prop);
+                            if (val) cssStyles += `${prop}: ${val}; `;
+                        }
+                    }
+
+                    targetFontElems.push({
+                        elementId,
+                        tagName: el.tagName.toLowerCase(),
+                        selector: el.tagName.toLowerCase() + (el.id ? `#${el.id}` : '') + (el.className && typeof el.className === 'string' ? '.' + el.className.split(/\s+/).filter(Boolean).slice(0, 2).join('.') : ''),
+                        fontFamily: style ? style.fontFamily : 'N/A',
+                        fontWeight: style ? style.fontWeight : 'N/A',
+                        textSnippet: text.slice(0, 100),
+                        outerHTML: el.outerHTML.slice(0, 2000),
+                        cssStyles,
+                        matchType: 'CTA Button'
+                    });
+                });
+            };
+
+            if (findingTypeLower === 'font') {
+                runFontFinding();
+            } else if (findingTypeLower === 'image') {
+                runImageFinding();
+            } else if (findingTypeLower === 'text') {
+                runTextFinding();
+            } else if (findingTypeLower === 'cta') {
+                runCtaFinding();
+            } else if (findingTypeLower === 'all') {
+                runFontFinding();
+                runImageFinding();
+                runTextFinding();
+                runCtaFinding();
             }
 
             const targetFontStyles = [];
-            function searchRules(rules, sheetName, sheetPath) {
-                if (!rules) return;
-                for (let i = 0; i < rules.length; i++) {
-                    const r = rules[i];
-                    if (r.cssRules) searchRules(r.cssRules, sheetName, sheetPath);
+            if (findingTypeLower === 'font' && findingValueLower) {
+                function searchRules(rules, sheetName, sheetPath) {
+                    if (!rules) return;
+                    for (let i = 0; i < rules.length; i++) {
+                        const r = rules[i];
+                        if (r.cssRules) searchRules(r.cssRules, sheetName, sheetPath);
 
-                    const cssText = r.cssText || '';
-                    if (cssText.toLowerCase().includes(fontLower)) {
-                        const selector = r.selectorText || (r.type === 5 ? '@font-face' : 'Rule');
-                        const matches = r.selectorText ? r.selectorText.match(/[\.#][a-zA-Z0-9_-]+/g) : null;
+                        const cssText = r.cssText || '';
+                        if (cssText.toLowerCase().includes(fontLower)) {
+                            const selector = r.selectorText || (r.type === 5 ? '@font-face' : 'Rule');
+                            const matches = r.selectorText ? r.selectorText.match(/[\.#][a-zA-Z0-9_-]+/g) : null;
 
-                        targetFontStyles.push({
-                            stylesheetName: sheetName,
-                            filePath: sheetPath,
-                            selector,
-                            classOrIdName: matches ? Array.from(new Set(matches)).join(', ') : '(Tag / @font-face)',
-                            cssRuleSnippet: cssText.trim().replace(/\s+/g, ' ').slice(0, 250)
-                        });
+                            targetFontStyles.push({
+                                stylesheetName: sheetName,
+                                filePath: sheetPath,
+                                selector,
+                                classOrIdName: matches ? Array.from(new Set(matches)).join(', ') : '(Tag / @font-face)',
+                                cssRuleSnippet: cssText.trim().replace(/\s+/g, ' ').slice(0, 250)
+                            });
+                        }
                     }
                 }
-            }
 
-            Array.from(document.styleSheets).forEach(sheet => {
-                let sheetPath = sheet.href || 'Inline Style Tag';
-                let sheetName = 'Inline Style Tag';
-                if (sheet.href) {
+                Array.from(document.styleSheets).forEach(sheet => {
+                    let sheetPath = sheet.href || 'Inline Style Tag';
+                    let sheetName = 'Inline Style Tag';
+                    if (sheet.href) {
+                        try {
+                            sheetName = new URL(sheet.href).pathname.split('/').pop() || sheet.href;
+                        } catch (e) {
+                            sheetName = sheet.href;
+                        }
+                    }
+
                     try {
-                        sheetName = new URL(sheet.href).pathname.split('/').pop() || sheet.href;
-                    } catch (e) {
-                        sheetName = sheet.href;
-                    }
-                }
-
-                try {
-                    if (sheet.cssRules) searchRules(sheet.cssRules, sheetName, sheetPath);
-                } catch (err) {}
-            });
+                        if (sheet.cssRules) searchRules(sheet.cssRules, sheetName, sheetPath);
+                    } catch (err) {}
+                });
+            }
 
             return {
                 detectedFonts: Array.from(detectedFonts),
@@ -298,7 +550,7 @@ async function auditSinglePage(browser, url, targetFontName = "Dinot", screensho
                 targetFontElems,
                 targetFontStyles
             };
-        }, targetFontName);
+        }, { findingType: realFindingType, findingValue: realFindingValue });
 
         // Process Font Classifications
         if (evaluatedData && evaluatedData.detectedFonts) {
@@ -349,5 +601,6 @@ async function auditSinglePage(browser, url, targetFontName = "Dinot", screensho
 
 module.exports = {
     fetchSitemapUrls,
+    crawlInternalUrls,
     auditSinglePage
 };

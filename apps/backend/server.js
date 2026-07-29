@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { chromium } = require('playwright');
-const { fetchSitemapUrls, auditSinglePage } = require('./services/siteCrawlerEngine');
+const { fetchSitemapUrls, crawlInternalUrls, auditSinglePage } = require('./services/siteCrawlerEngine');
 const { generateExcelReport } = require('./services/excelExportService');
 const { cleanOutputs } = require('./cleanup_outputs');
 
@@ -46,10 +46,18 @@ app.get('/api/health', (req, res) => {
  * 2. POST /api/audit/full - Full Website Sitemap Audit (Asynchronous)
  */
 app.post('/api/audit/full', async (req, res) => {
-    const { sitemapUrl, fontName = "Dinot", maxPages = 100 } = req.body;
+    const { sitemapUrl, crawlUrl, urls, findingType = "font", findingValue, fontName, maxPages = 50 } = req.body;
+    let val = "";
+    if (findingValue !== undefined) {
+        val = findingValue;
+    } else if (fontName !== undefined) {
+        val = fontName;
+    } else {
+        val = "Dinot";
+    }
 
-    if (!sitemapUrl) {
-        return res.status(400).json({ error: 'sitemapUrl parameter is required' });
+    if (!sitemapUrl && !crawlUrl && (!urls || !Array.isArray(urls) || urls.length === 0)) {
+        return res.status(400).json({ error: 'Either sitemapUrl, crawlUrl, or urls parameter is required' });
     }
 
     const jobId = uuidv4();
@@ -60,8 +68,10 @@ app.post('/api/audit/full', async (req, res) => {
         jobId,
         status: 'pending',
         progress: { current: 0, total: 0, currentUrl: '', percent: 0 },
-        sitemapUrl,
-        fontName,
+        sitemapUrl: sitemapUrl || crawlUrl || (urls ? urls[0] : ''),
+        fontName: val,
+        findingType,
+        findingValue: val,
         createdAt: new Date().toISOString(),
         completedAt: null,
         excelPath: null,
@@ -74,8 +84,17 @@ app.post('/api/audit/full', async (req, res) => {
     (async () => {
         jobs[jobId].status = 'running';
         try {
-            const urls = await fetchSitemapUrls(sitemapUrl);
-            const targetUrls = urls.slice(0, maxPages);
+            let targetUrls = [];
+            if (urls && Array.isArray(urls) && urls.length > 0) {
+                targetUrls = urls.slice(0, maxPages);
+            } else if (crawlUrl) {
+                const crawled = await crawlInternalUrls(crawlUrl, maxPages);
+                targetUrls = crawled.slice(0, maxPages);
+            } else if (sitemapUrl) {
+                const fetched = await fetchSitemapUrls(sitemapUrl);
+                targetUrls = fetched.slice(0, maxPages);
+            }
+
             jobs[jobId].progress.total = targetUrls.length;
 
             const browser = await chromium.launch({ headless: true, args: ['--disable-web-security'] });
@@ -88,7 +107,7 @@ app.post('/api/audit/full', async (req, res) => {
                 jobs[jobId].progress.currentUrl = url;
                 jobs[jobId].progress.percent = Math.round(((i + 1) / targetUrls.length) * 100);
 
-                const res = await auditSinglePage(browser, url, fontName, jobDir, ssCounter);
+                const res = await auditSinglePage(browser, url, findingType, val, jobDir, ssCounter);
                 pageResults.push(res);
             }
 
@@ -99,6 +118,7 @@ app.post('/api/audit/full', async (req, res) => {
             const allCTAs = [];
             const allMissingAltImages = [];
             const allHeadings = [];
+            const allTargetMatches = [];
             let targetElemCount = 0;
             let targetStyleCount = 0;
 
@@ -122,20 +142,26 @@ app.post('/api/audit/full', async (req, res) => {
                 // Headings aggregation
                 (p.headings || []).forEach(h => allHeadings.push({ url: p.url, ...h }));
 
+                // Target Matches aggregation
+                (p.targetFontElements || []).forEach(m => allTargetMatches.push({ url: p.url, ...m }));
+
                 targetElemCount += (p.targetFontElements || []).length;
                 targetStyleCount += (p.targetFontStylesheets || []).length;
             });
 
             const fullAuditData = {
                 jobId,
-                sitemapUrl,
-                fontName,
+                sitemapUrl: sitemapUrl || crawlUrl || (urls ? urls[0] : ''),
+                fontName: val,
+                findingType,
+                findingValue: val,
                 auditedAt: new Date().toISOString(),
                 pages: pageResults,
                 fontSummary: Array.from(fontMap.values()),
                 allCTAs,
                 allMissingAltImages,
                 allHeadings,
+                allTargetMatches,
                 targetFontElementCount: targetElemCount,
                 targetFontStyleCount: targetStyleCount
             };
@@ -178,7 +204,15 @@ app.post('/api/audit/full', async (req, res) => {
  * 3. POST /api/audit/quick-scan - Single Page Instant Audit (Synchronous)
  */
 app.post('/api/audit/quick-scan', async (req, res) => {
-    const { url, fontName = "Dinot" } = req.body;
+    const { url, findingType = "font", findingValue, fontName } = req.body;
+    let val = "";
+    if (findingValue !== undefined) {
+        val = findingValue;
+    } else if (fontName !== undefined) {
+        val = fontName;
+    } else {
+        val = "Dinot";
+    }
 
     if (!url) {
         return res.status(400).json({ error: 'url parameter is required' });
@@ -186,7 +220,7 @@ app.post('/api/audit/quick-scan', async (req, res) => {
 
     try {
         const browser = await chromium.launch({ headless: true, args: ['--disable-web-security'] });
-        const auditResult = await auditSinglePage(browser, url, fontName);
+        const auditResult = await auditSinglePage(browser, url, findingType, val);
         await browser.close();
 
         res.json({

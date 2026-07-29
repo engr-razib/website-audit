@@ -9,17 +9,31 @@ export function Navbar() {
   const [status, setStatus] = useState<"checking" | "online" | "offline">("checking");
 
   useEffect(() => {
+    let intervalId: any = null;
+
     const check = async () => {
       try {
         await checkBackendHealth();
         setStatus("online");
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
       } catch (err) {
         setStatus("offline");
+        if (!intervalId) {
+          intervalId = setInterval(check, 15000);
+        }
       }
     };
+
     check();
-    const interval = setInterval(check, 15000);
-    return () => clearInterval(interval);
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, []);
 
   return (

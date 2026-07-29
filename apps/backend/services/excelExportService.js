@@ -17,8 +17,10 @@ async function generateExcelReport(fullAuditData, filePath) {
         }
     };
 
-    function applyRowStyles(row, isEven, aligns = []) {
-        row.height = 24;
+    function applyRowStyles(row, isEven, aligns = [], rowHeight = 24) {
+        if (rowHeight) {
+            row.height = rowHeight;
+        }
         const rowBgColor = isEven ? 'FFF2F5F9' : 'FFFFFFFF';
         row.eachCell((cell, colNum) => {
             cell.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF333333' } };
@@ -59,8 +61,8 @@ async function generateExcelReport(fullAuditData, filePath) {
         ['Free / Google / System Fonts Found', uniqueFonts - premiumFontsCount],
         ['Total Buttons & CTAs Discovered', totalCTAs],
         ['Total Images Missing Alt Tags', missingAltImagesCount],
-        ['Target Font (Dinot) Element Matches', fullAuditData.targetFontElementCount || 0],
-        ['Target Font (Dinot) Stylesheet Matches', fullAuditData.targetFontStyleCount || 0]
+        ['Target Element / Finding Matches', fullAuditData.targetFontElementCount || 0],
+        ['Target Stylesheet Hits', fullAuditData.targetFontStyleCount || 0]
     ];
 
     metrics.forEach(([label, val], idx) => {
@@ -101,8 +103,8 @@ async function generateExcelReport(fullAuditData, filePath) {
     // -------------------------------------------------------------
     const ctaSheet = workbook.addWorksheet('Button & CTA Designs');
     ctaSheet.views = [{ state: 'frozen', ySplit: 1, showGridLines: true }];
-    const ctaHeaders = ['SL', 'Target Page URL', 'Element Tag', 'CTA Text Snippet', 'Font Family', 'Font Size', 'Font Weight', 'Text Color', 'Background Color', 'Border Radius', 'Padding', 'Selector'];
-    const ctaColWidths = [8, 40, 15, 30, 25, 12, 12, 18, 20, 15, 15, 25];
+    const ctaHeaders = ['SL', 'Target Page URL', 'Element Tag', 'CTA Text Snippet', 'Font Family', 'Font Size', 'Font Weight', 'Text Color', 'Background Color', 'Border Radius', 'Padding', 'Selector', 'Full HTML Tag', 'Relevant CSS Styles'];
+    const ctaColWidths = [8, 40, 15, 30, 25, 12, 12, 18, 20, 15, 15, 25, 55, 55];
     const cHeaderRow = ctaSheet.addRow(ctaHeaders);
     cHeaderRow.height = 28;
     cHeaderRow.eachCell((cell, colNum) => {
@@ -123,9 +125,11 @@ async function generateExcelReport(fullAuditData, filePath) {
             c.backgroundColor,
             c.borderRadius,
             c.padding,
-            c.selector
+            c.selector,
+            c.outerHTML || '',
+            c.cssStyles || ''
         ]);
-        applyRowStyles(row, idx % 2 === 1, ['center', 'left', 'center', 'left', 'left', 'center', 'center', 'center', 'center', 'center', 'center', 'left']);
+        applyRowStyles(row, idx % 2 === 1, ['center', 'left', 'center', 'left', 'left', 'center', 'center', 'center', 'center', 'center', 'center', 'left', 'left', 'left'], 45);
     });
 
     // -------------------------------------------------------------
@@ -133,8 +137,8 @@ async function generateExcelReport(fullAuditData, filePath) {
     // -------------------------------------------------------------
     const imgSheet = workbook.addWorksheet('Missing Alt Tag Images');
     imgSheet.views = [{ state: 'frozen', ySplit: 1, showGridLines: true }];
-    const imgHeaders = ['SL', 'Target Page URL', 'Image Source URL', 'Alt Tag Status', 'Natural Dimensions', 'Parent Element Tag', 'CSS Selector'];
-    const imgColWidths = [8, 40, 55, 20, 20, 18, 25];
+    const imgHeaders = ['SL', 'Target Page URL', 'Image Source URL', 'Alt Tag Status', 'Natural Dimensions', 'Parent Element Tag', 'CSS Selector', 'Full HTML Tag', 'Relevant CSS Styles'];
+    const imgColWidths = [8, 40, 55, 20, 20, 18, 25, 55, 55];
     const iHeaderRow = imgSheet.addRow(imgHeaders);
     iHeaderRow.height = 28;
     iHeaderRow.eachCell((cell, colNum) => {
@@ -150,9 +154,11 @@ async function generateExcelReport(fullAuditData, filePath) {
             'MISSING ALT TAG',
             `${img.width} x ${img.height} px`,
             img.parentTag,
-            img.selector
+            img.selector,
+            img.outerHTML || '',
+            img.cssStyles || ''
         ]);
-        applyRowStyles(row, idx % 2 === 1, ['center', 'left', 'left', 'center', 'center', 'center', 'left']);
+        applyRowStyles(row, idx % 2 === 1, ['center', 'left', 'left', 'center', 'center', 'center', 'left', 'left', 'left'], 45);
     });
 
     // -------------------------------------------------------------
@@ -160,8 +166,8 @@ async function generateExcelReport(fullAuditData, filePath) {
     // -------------------------------------------------------------
     const headSheet = workbook.addWorksheet('Heading Typography (H1-H6)');
     headSheet.views = [{ state: 'frozen', ySplit: 1, showGridLines: true }];
-    const headHeaders = ['SL', 'Target Page URL', 'Heading Tag', 'Heading Text Snippet', 'Font Family', 'Font Size', 'Font Weight', 'Color', 'Line Height', 'Text Transform'];
-    const headColWidths = [8, 40, 15, 35, 25, 12, 12, 18, 15, 18];
+    const headHeaders = ['SL', 'Target Page URL', 'Heading Tag', 'Heading Text Snippet', 'Font Family', 'Font Size', 'Font Weight', 'Color', 'Line Height', 'Text Transform', 'Full HTML Tag', 'Relevant CSS Styles'];
+    const headColWidths = [8, 40, 15, 35, 25, 12, 12, 18, 15, 18, 55, 55];
     const hHeaderRow = headSheet.addRow(headHeaders);
     hHeaderRow.height = 28;
     hHeaderRow.eachCell((cell, colNum) => {
@@ -180,9 +186,11 @@ async function generateExcelReport(fullAuditData, filePath) {
             h.fontWeight,
             h.color,
             h.lineHeight,
-            h.textTransform
+            h.textTransform,
+            h.outerHTML || '',
+            h.cssStyles || ''
         ]);
-        applyRowStyles(row, idx % 2 === 1, ['center', 'left', 'center', 'left', 'left', 'center', 'center', 'center', 'center', 'center']);
+        applyRowStyles(row, idx % 2 === 1, ['center', 'left', 'center', 'left', 'left', 'center', 'center', 'center', 'center', 'center', 'left', 'left'], 45);
     });
 
     // -------------------------------------------------------------
@@ -213,6 +221,37 @@ async function generateExcelReport(fullAuditData, filePath) {
             `${s.altCoveragePercent || 100}%`
         ]);
         applyRowStyles(row, idx % 2 === 1, ['center', 'left', 'left', 'center', 'left', 'center', 'center', 'center', 'center']);
+    });
+
+    // -------------------------------------------------------------
+    // Worksheet 7: Target Finding Matches
+    // -------------------------------------------------------------
+    const matchesSheet = workbook.addWorksheet('Finding Matches');
+    matchesSheet.views = [{ state: 'frozen', ySplit: 1, showGridLines: true }];
+    const matchHeaders = ['SL', 'Target Page URL', 'Match Type', 'Element Tag', 'Selector', 'Snippet / Detail', 'Full HTML Tag', 'Relevant CSS Styles'];
+    const matchColWidths = [8, 40, 18, 15, 30, 35, 55, 55];
+    const mHeaderRow = matchesSheet.addRow(matchHeaders);
+    mHeaderRow.height = 28;
+    mHeaderRow.eachCell((cell, colNum) => {
+        Object.assign(cell, headerStyle);
+        matchesSheet.getColumn(colNum).width = matchColWidths[colNum - 1];
+    });
+
+    let matchIdx = 0;
+    (fullAuditData.pages || []).forEach(p => {
+        (p.targetFontElements || []).forEach(m => {
+            const row = matchesSheet.addRow([
+                ++matchIdx,
+                p.url,
+                m.matchType || 'N/A',
+                m.tagName,
+                m.selector,
+                m.textSnippet,
+                m.outerHTML || '',
+                m.cssStyles || ''
+            ]);
+            applyRowStyles(row, matchIdx % 2 === 1, ['center', 'left', 'center', 'center', 'left', 'left', 'left', 'left'], 45);
+        });
     });
 
     // Write file

@@ -1,4 +1,5 @@
 $kind: http-request
+name: 1. Health Check
 description: Checks microservice status, service uptime, and server health.
 url: "{{baseUrl}}/api/health"
 method: GET

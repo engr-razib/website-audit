@@ -4,3 +4,5 @@ description: Postman Collection for testing Website Audit Microservice REST API 
 variables:
   baseUrl: http://localhost:3000
   jobId: ""
+  Live: ""
+  localBaseURl: ""

@@ -9,6 +9,7 @@ import { FontAuditTable } from "@/components/FontAuditTable";
 import { ButtonAuditGrid } from "@/components/ButtonAuditGrid";
 import { MissingAltTable } from "@/components/MissingAltTable";
 import { HeadingAuditTable } from "@/components/HeadingAuditTable";
+import { TargetMatchesTable } from "@/components/TargetMatchesTable";
 import { DownloadBar } from "@/components/DownloadBar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Type, MousePointer, Image, Heading, Code2, Zap, Globe, Sparkles } from "lucide-react";
@@ -67,6 +68,7 @@ export default function AuditDashboardPage() {
   const ctaList = auditData?.allCTAs || auditData?.ctas || [];
   const missingAltList = auditData?.allMissingAltImages || (auditData?.images || []).filter((i: any) => !i.hasAlt);
   const headingList = auditData?.allHeadings || auditData?.headings || [];
+  const targetMatchesList = auditData?.allTargetMatches || auditData?.targetFontElements || [];
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
@@ -128,8 +130,12 @@ export default function AuditDashboardPage() {
       {/* Audit Data Breakdown Tabs */}
       {auditData && (
         <div className="space-y-4">
-          <Tabs defaultValue="fonts">
+          <Tabs defaultValue="matches">
             <TabsList>
+              <TabsTrigger value="matches" className="gap-2">
+                <Sparkles className="h-4 w-4 text-emerald-400" />
+                Finding Matches ({targetMatchesList.length})
+              </TabsTrigger>
               <TabsTrigger value="fonts" className="gap-2">
                 <Type className="h-4 w-4 text-indigo-400" />
                 Font Families ({fontList.length})
@@ -151,6 +157,10 @@ export default function AuditDashboardPage() {
                 Raw JSON Payload
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="matches">
+              <TargetMatchesTable matches={targetMatchesList} jobId={activeJobId} />
+            </TabsContent>
 
             <TabsContent value="fonts">
               <FontAuditTable fonts={fontList} />
