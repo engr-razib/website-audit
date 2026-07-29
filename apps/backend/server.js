@@ -3,7 +3,6 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const { chromium } = require('playwright');
 const { fetchSitemapUrls, crawlInternalUrls, auditSinglePage } = require('./services/siteCrawlerEngine');
 const { generateExcelReport } = require('./services/excelExportService');
 const { cleanOutputs } = require('./cleanup_outputs');
@@ -12,7 +11,7 @@ const { cleanOutputs } = require('./cleanup_outputs');
 cleanOutputs();
 setInterval(() => {
     cleanOutputs();
-}, 6 * 60 * 60 * 1000);
+}, 6 * 60 * 60 * 1000).unref();
 
 
 const app = express();
@@ -97,7 +96,6 @@ app.post('/api/audit/full', async (req, res) => {
 
             jobs[jobId].progress.total = targetUrls.length;
 
-            const browser = await chromium.launch({ headless: true, args: ['--disable-web-security'] });
             const pageResults = [];
             const ssCounter = { val: 1 };
 
@@ -107,11 +105,9 @@ app.post('/api/audit/full', async (req, res) => {
                 jobs[jobId].progress.currentUrl = url;
                 jobs[jobId].progress.percent = Math.round(((i + 1) / targetUrls.length) * 100);
 
-                const res = await auditSinglePage(browser, url, findingType, val, jobDir, ssCounter);
+                const res = await auditSinglePage(null, url, findingType, val, jobDir, ssCounter);
                 pageResults.push(res);
             }
-
-            await browser.close();
 
             // Aggregating Summary Metrics
             const fontMap = new Map();
@@ -219,9 +215,7 @@ app.post('/api/audit/quick-scan', async (req, res) => {
     }
 
     try {
-        const browser = await chromium.launch({ headless: true, args: ['--disable-web-security'] });
-        const auditResult = await auditSinglePage(browser, url, findingType, val);
-        await browser.close();
+        const auditResult = await auditSinglePage(null, url, findingType, val);
 
         res.json({
             status: 'success',

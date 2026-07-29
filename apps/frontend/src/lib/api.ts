@@ -9,7 +9,7 @@ export interface HealthResponse {
 
 export interface QuickScanRequest {
   url: string;
-  findingType?: 'font' | 'image' | 'text' | 'cta';
+  findingType?: 'all' | 'font' | 'image' | 'text' | 'cta';
   findingValue?: string;
   fontName?: string;
 }
@@ -18,7 +18,7 @@ export interface FullAuditRequest {
   sitemapUrl?: string;
   crawlUrl?: string;
   urls?: string[];
-  findingType?: 'font' | 'image' | 'text' | 'cta';
+  findingType?: 'all' | 'font' | 'image' | 'text' | 'cta';
   findingValue?: string;
   fontName?: string;
   maxPages?: number;

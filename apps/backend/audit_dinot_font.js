@@ -1,4 +1,4 @@
-const { chromium } = require('playwright');
+const cheerio = require('cheerio');
 const ExcelJS = require('exceljs');
 const axios = require('axios');
 const xml2js = require('xml2js');
@@ -23,34 +23,28 @@ if (!fs.existsSync(SCREENSHOTS_DIR)) {
     fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 }
 
+function parseInlineStyles(styleAttr) {
+    const styles = {};
+    if (!styleAttr) return styles;
+    styleAttr.split(';').forEach(p => {
+        const parts = p.split(':');
+        if (parts.length >= 2) {
+            styles[parts[0].trim().toLowerCase()] = parts.slice(1).join(':').trim();
+        }
+    });
+    return styles;
+}
+
 async function fetchSitemapUrls(sitemapUrl) {
-    console.log(`[+] Fetching XML Sitemap: ${sitemapUrl}`);
+    console.log(`[+] Fetching XML Sitemap (Axios Static): ${sitemapUrl}`);
     let xmlData = null;
     
-    // Attempt 1: Axios with 30s timeout
     try {
         const response = await axios.get(sitemapUrl, { headers: HEADERS, timeout: 30000 });
         xmlData = response.data;
     } catch (err) {
-        console.warn(`[!] Axios sitemap fetch failed (${err.message}). Retrying via Playwright Chromium...`);
-    }
-
-    // Attempt 2: Playwright fallback if Axios failed
-    if (!xmlData) {
-        let browser = null;
-        try {
-            browser = await chromium.launch({ headless: true, args: ['--disable-web-security'] });
-            const context = await browser.newContext({ userAgent: HEADERS['User-Agent'] });
-            const page = await context.newPage();
-            const res = await page.goto(sitemapUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-            xmlData = await res.text();
-            await context.close();
-        } catch (pwErr) {
-            console.error(`[!] Playwright sitemap fetch also failed: ${pwErr.message}`);
-            throw pwErr;
-        } finally {
-            if (browser) await browser.close();
-        }
+        console.error(`[!] Axios sitemap fetch failed: ${err.message}`);
+        throw err;
     }
 
     const parser = new xml2js.Parser();
@@ -225,7 +219,7 @@ async function exportToExcel(elementRecords, styleRecords, filename) {
         if (e.code === 'EBUSY' || e.code === 'EPERM') {
             const fallback = filename.replace('.xlsx', '_v2.xlsx');
             const buffer = await workbook.xlsx.writeBuffer();
-            fs.writeFileSync(fallback, fallback ? buffer : buffer);
+            fs.writeFileSync(fallback, buffer);
             console.log(`[!] Primary Excel file locked. Saved to fallback: ${fallback}`);
         } else {
             throw e;
@@ -234,216 +228,106 @@ async function exportToExcel(elementRecords, styleRecords, filename) {
 }
 
 async function auditSinglePage(browser, url, index, total, screenshotCounterRef) {
-    const context = await browser.newContext({ userAgent: HEADERS['User-Agent'], viewport: { width: 1280, height: 800 } });
-    const page = await context.newPage();
     const elementFindings = [];
     const styleFindings = [];
 
     try {
         console.log(`[${index}/${total}] Auditing: ${url}`);
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
-        await page.waitForTimeout(1500);
+        const response = await axios.get(url, { headers: HEADERS, timeout: 25000 });
+        const html = response.data;
+        const $ = cheerio.load(html);
 
-        const auditData = await page.evaluate((targetFontName) => {
-            const elemResults = [];
-            const styleResults = [];
-            const fontLower = targetFontName.toLowerCase();
+        const fontLower = FINDING_FONT.toLowerCase();
 
-            // 1. Rendered DOM Elements Audit
-            const candidates = document.querySelectorAll('h1, h2, h3, h4, h5, h6, p, a, button, li, span, strong, b, em, td, th, label, input, div');
+        // 1. Rendered DOM Elements Audit
+        const candidates = $('h1, h2, h3, h4, h5, h6, p, a, button, li, span, strong, b, em, td, th, label, input, div');
 
-            for (let i = 0; i < candidates.length; i++) {
-                const el = candidates[i];
-                const style = window.getComputedStyle(el);
-                if (!style || style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
-                    continue;
-                }
+        candidates.each((i, el) => {
+            const tagName = el.tagName.toLowerCase();
+            const inlineStyles = parseInlineStyles($(el).attr('style'));
+            const fontFamily = inlineStyles['font-family'] || '';
 
-                const fontFamily = style.fontFamily || '';
-                if (!fontFamily.toLowerCase().includes(fontLower)) {
-                    continue;
-                }
-
-                const tagName = el.tagName.toLowerCase();
-
-                let directText = '';
-                for (const child of el.childNodes) {
-                    if (child.nodeType === Node.TEXT_NODE) {
-                        directText += child.textContent;
-                    }
-                }
-                directText = directText.trim().replace(/\s+/g, ' ');
-
-                const fullText = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
-                if (!fullText) continue;
-
-                if (tagName === 'div') {
-                    const hasStructuredChild = el.querySelector('h1, h2, h3, h4, h5, h6, p, a, button');
-                    if (hasStructuredChild || !directText) {
-                        continue;
-                    }
-                }
-
-                const className = typeof el.className === 'string' ? el.className.trim() : '';
-                let selector = tagName;
-                if (el.id) selector += `#${el.id}`;
-                if (className) {
-                    const cleanClasses = className.split(/\s+/).filter(c => c && !c.includes('et_pb_column') && !c.includes('et_pb_row'));
-                    if (cleanClasses.length > 0) {
-                        selector += '.' + cleanClasses.slice(0, 2).join('.');
-                    }
-                }
-
-                const elementId = 'font-elem-' + elemResults.length;
-                el.setAttribute('data-font-audit-id', elementId);
-
-                try {
-                    el.style.outline = '3px solid #E63946';
-                    el.style.outlineOffset = '2px';
-                    el.style.backgroundColor = 'rgba(230, 57, 70, 0.12)';
-                    el.style.transition = 'all 0.3s ease';
-
-                    const badge = document.createElement('span');
-                    badge.className = 'font-audit-badge';
-                    badge.innerText = `[${targetFontName}: ${fontFamily} | Weight: ${style.fontWeight}]`;
-                    badge.style.position = 'absolute';
-                    badge.style.top = '-22px';
-                    badge.style.left = '0';
-                    badge.style.backgroundColor = '#E63946';
-                    badge.style.color = '#FFFFFF';
-                    badge.style.fontSize = '11px';
-                    badge.style.fontFamily = 'Segoe UI, sans-serif';
-                    badge.style.fontWeight = 'bold';
-                    badge.style.padding = '2px 6px';
-                    badge.style.borderRadius = '3px';
-                    badge.style.zIndex = '999999';
-                    badge.style.pointerEvents = 'none';
-
-                    if (el.style.position === 'static' || !el.style.position) {
-                        el.style.position = 'relative';
-                    }
-                    el.appendChild(badge);
-                } catch(e){}
-
-                elemResults.push({
-                    elementId,
-                    tagName,
-                    className: className || '(None)',
-                    selector,
-                    fontFamily,
-                    fontWeight: style.fontWeight || '400',
-                    textSnippet: fullText.slice(0, 60)
-                });
+            if (!fontFamily.toLowerCase().includes(fontLower)) {
+                return;
             }
 
-            // 2. CSS Stylesheet & Rule Audit
-            function searchRules(rules, stylesheetName, filePath) {
-                if (!rules) return;
-                for (let i = 0; i < rules.length; i++) {
-                    const r = rules[i];
-                    if (r.cssRules) {
-                        searchRules(r.cssRules, stylesheetName, filePath);
-                    }
-                    const cssText = r.cssText || '';
-                    if (cssText.toLowerCase().includes(fontLower)) {
-                        const selector = r.selectorText || (r.type === 5 ? '@font-face' : (r.name ? `@keyframes ${r.name}` : 'Rule'));
-                        const classesAndIds = [];
-                        if (r.selectorText) {
-                            const matches = r.selectorText.match(/[\.#][a-zA-Z0-9_-]+/g);
-                            if (matches) {
-                                classesAndIds.push(...matches);
-                            }
-                        }
-
-                        styleResults.push({
-                            stylesheetName,
-                            filePath,
-                            selector,
-                            classOrIdName: classesAndIds.length > 0 ? Array.from(new Set(classesAndIds)).join(', ') : '(None / Tag / @font-face)',
-                            cssRuleSnippet: cssText.trim().replace(/\s+/g, ' ').slice(0, 250)
-                        });
-                    }
-                }
-            }
-
-            const sheets = Array.from(document.styleSheets);
-            sheets.forEach((sheet) => {
-                let filePath = sheet.href || 'Inline Style Tag';
-                let stylesheetName = 'Inline Style Tag';
-                if (sheet.href) {
-                    try {
-                        const u = new URL(sheet.href);
-                        stylesheetName = u.pathname.split('/').pop() || sheet.href;
-                    } catch(e) {
-                        stylesheetName = sheet.href;
-                    }
-                } else if (sheet.ownerNode && sheet.ownerNode.id) {
-                    stylesheetName = `Inline <style id="${sheet.ownerNode.id}">`;
-                }
-
-                try {
-                    if (sheet.cssRules) {
-                        searchRules(sheet.cssRules, stylesheetName, filePath);
-                    }
-                } catch(err) {
-                    // CORS or security restriction fallback
+            let directText = '';
+            $(el).contents().each((j, child) => {
+                if (child.nodeType === 3) { // TEXT_NODE
+                    directText += $(child).text();
                 }
             });
+            directText = directText.trim().replace(/\s+/g, ' ');
 
-            return { elemResults, styleResults };
-        }, FINDING_FONT);
+            const fullText = ($(el).text() || '').trim().replace(/\s+/g, ' ');
+            if (!fullText) return;
 
-        const pageElemMatches = auditData ? auditData.elemResults : [];
-        const pageStyleMatches = auditData ? auditData.styleResults : [];
-
-        if (pageElemMatches.length > 0 || pageStyleMatches.length > 0) {
-            console.log(`  [OK] ${url}: Found ${pageElemMatches.length} rendered element(s) & ${pageStyleMatches.length} stylesheet rule(s) referencing "${FINDING_FONT}"`);
-        }
-
-        // Process Element Screenshots
-        if (pageElemMatches && pageElemMatches.length > 0) {
-            for (const match of pageElemMatches) {
-                const urlSlug = url.replace(/https?:\/\//, '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 25);
-                const ssNum = screenshotCounterRef.val++;
-                const screenshotFilename = `${FONT_SLUG}_${ssNum.toString().padStart(3, '0')}_${urlSlug}_${match.tagName}.png`;
-                let screenshotPath = path.join(SCREENSHOTS_DIR, screenshotFilename);
-
-                let ssSaved = false;
-                try {
-                    const elemHandle = await page.$(`[data-font-audit-id="${match.elementId}"]`);
-                    if (elemHandle) {
-                        await elemHandle.scrollIntoViewIfNeeded();
-                        await page.waitForTimeout(200);
-                        await elemHandle.screenshot({ path: screenshotPath, timeout: 4000 });
-                        ssSaved = true;
-                    }
-                } catch (e) {}
-
-                if (!ssSaved) {
-                    try {
-                        await page.screenshot({ path: screenshotPath, timeout: 4000 });
-                        ssSaved = true;
-                    } catch (e) {
-                        screenshotPath = "Screenshot unavailable";
-                    }
+            if (tagName === 'div') {
+                const hasStructuredChild = $(el).find('h1, h2, h3, h4, h5, h6, p, a, button').length > 0;
+                if (hasStructuredChild || !directText) {
+                    return;
                 }
-
-                match.screenshotPath = ssSaved ? screenshotPath : "N/A";
-                elementFindings.push({ url, ...match });
             }
-        }
 
-        // Process Style Findings
-        if (pageStyleMatches && pageStyleMatches.length > 0) {
-            for (const sMatch of pageStyleMatches) {
-                styleFindings.push({ url, ...sMatch });
+            const className = $(el).attr('class') || '';
+            let selector = tagName;
+            const id = $(el).attr('id');
+            if (id) selector += `#${id}`;
+            if (className) {
+                const cleanClasses = className.split(/\s+/).filter(c => c && !c.includes('et_pb_column') && !c.includes('et_pb_row'));
+                if (cleanClasses.length > 0) {
+                    selector += '.' + cleanClasses.slice(0, 2).join('.');
+                }
             }
+
+            elementFindings.push({
+                url,
+                elementId: `font-elem-${elementFindings.length}`,
+                tagName,
+                className: className || '(None)',
+                selector,
+                fontFamily,
+                fontWeight: inlineStyles['font-weight'] || '400',
+                textSnippet: fullText.slice(0, 60),
+                screenshotPath: 'N/A'
+            });
+        });
+
+        // 2. CSS Stylesheet & Rule Audit
+        $('style').each((i, el) => {
+            const cssText = $(el).text();
+            if (cssText.toLowerCase().includes(fontLower)) {
+                const rules = cssText.split('}');
+                rules.forEach(rule => {
+                    if (rule.toLowerCase().includes(fontLower)) {
+                        const parts = rule.split('{');
+                        const selector = parts[0].trim() || 'Style Block';
+                        const cssRuleSnippet = parts[1] ? parts[1].trim() : '';
+                        const classesAndIds = [];
+                        const matches = selector.match(/[\.#][a-zA-Z0-9_-]+/g);
+                        if (matches) {
+                            classesAndIds.push(...matches);
+                        }
+
+                        styleFindings.push({
+                            url,
+                            stylesheetName: 'Inline Style Tag',
+                            filePath: 'Inline Style Tag',
+                            selector,
+                            classOrIdName: classesAndIds.length > 0 ? Array.from(new Set(classesAndIds)).join(', ') : '(None / Tag / @font-face)',
+                            cssRuleSnippet: `${selector} { ${cssRuleSnippet} }`.slice(0, 250)
+                        });
+                    }
+                });
+            }
+        });
+
+        if (elementFindings.length > 0 || styleFindings.length > 0) {
+            console.log(`  [OK] ${url}: Found ${elementFindings.length} elements & ${styleFindings.length} stylesheet rules referencing "${FINDING_FONT}"`);
         }
 
     } catch (e) {
         console.error(`  [!] Error auditing ${url}: ${e.message}`);
-    } finally {
-        await context.close();
     }
 
     return { elementFindings, styleFindings };
@@ -453,7 +337,6 @@ async function main() {
     console.log(`========================================`);
     console.log(`[+] Target Font to Audit: "${FINDING_FONT}"`);
     console.log(`[+] Excel Output Report: ${EXCEL_OUTPUT}`);
-    console.log(`[+] Screenshots Folder: ${SCREENSHOTS_DIR}`);
     console.log(`========================================\n`);
 
     const urls = await fetchSitemapUrls(SITEMAP_URL);
@@ -461,10 +344,6 @@ async function main() {
         console.error("[!] No URLs found to audit.");
         return;
     }
-
-    const isHeadless = process.env.HEADLESS !== 'false';
-    console.log(`[+] Launching Playwright Chromium Browser (Headless: ${isHeadless}, Concurrency: ${CONCURRENCY})...`);
-    const browser = await chromium.launch({ headless: isHeadless, args: ['--disable-web-security'] });
 
     const allElementFindings = [];
     const allStyleFindings = [];
@@ -475,7 +354,7 @@ async function main() {
 
     for (let i = 0; i < urls.length; i += CONCURRENCY) {
         const batch = urls.slice(i, i + CONCURRENCY);
-        const batchPromises = batch.map((url, idx) => auditSinglePage(browser, url, i + idx + 1, urls.length, screenshotCounterRef));
+        const batchPromises = batch.map((url, idx) => auditSinglePage(null, url, i + idx + 1, urls.length, screenshotCounterRef));
         const batchResults = await Promise.all(batchPromises);
 
         batchResults.forEach(res => {
@@ -501,19 +380,16 @@ async function main() {
         });
     }
 
-    await browser.close();
-
     console.log(`\n========================================`);
     console.log(`[+] Total Unique ${FINDING_FONT} Element Records: ${allElementFindings.length}`);
     console.log(`[+] Total Unique ${FINDING_FONT} Stylesheet Rule Records: ${allStyleFindings.length}`);
-    console.log(`[+] Screenshots Saved to: ${SCREENSHOTS_DIR}`);
     console.log(`========================================\n`);
 
     await exportToExcel(allElementFindings, allStyleFindings, EXCEL_OUTPUT);
 }
 
 main().then(() => {
-    console.log("[✓] Node.js Dynamic Font Audit Finished Successfully.");
+    console.log("[✓] Node.js Static Font Audit Finished Successfully.");
 }).catch(err => {
     console.error("[!] Script Execution Error:", err);
 });

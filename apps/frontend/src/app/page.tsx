@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { QuickScanForm } from "@/components/QuickScanForm";
 import { FullAuditForm } from "@/components/FullAuditForm";
 import { JobStatusTracker } from "@/components/JobStatusTracker";
@@ -22,7 +22,7 @@ export default function AuditDashboardPage() {
   const [mode, setMode] = useState<"quick" | "full">("quick");
 
   // Quick Scan handler
-  const handleQuickScanComplete = (quickScanResult: any) => {
+  const handleQuickScanComplete = useCallback((quickScanResult: any) => {
     setAuditData(quickScanResult);
     setActiveJobId(null);
     // Derive summary metrics for quick scan
@@ -38,17 +38,17 @@ export default function AuditDashboardPage() {
       targetFontElementMatches: (quickScanResult.targetFontElements || []).length,
       targetFontStyleMatches: (quickScanResult.targetFontStylesheets || []).length,
     });
-  };
+  }, []);
 
   // Async job started handler
-  const handleJobStarted = (jobId: string) => {
+  const handleJobStarted = useCallback((jobId: string) => {
     setActiveJobId(jobId);
     setAuditData(null);
     setJobSummary(null);
-  };
+  }, []);
 
   // Async job finished handler
-  const handleJobCompleted = async (jobData: JobStatusResponse) => {
+  const handleJobCompleted = useCallback(async (jobData: JobStatusResponse) => {
     if (jobData.summary) {
       setJobSummary(jobData.summary);
     }
@@ -61,7 +61,7 @@ export default function AuditDashboardPage() {
     } catch (e) {
       console.error("Failed to load completed audit JSON", e);
     }
-  };
+  }, []);
 
   // Calculate normalized display lists
   const fontList = auditData?.fontSummary || auditData?.fonts || [];
