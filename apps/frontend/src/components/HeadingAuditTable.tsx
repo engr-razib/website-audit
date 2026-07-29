@@ -56,7 +56,7 @@ export function HeadingAuditTable({ headings = [] }: HeadingAuditTableProps) {
                   </td>
                   <td className="p-3 text-slate-400">{h.fontFamily?.split(",")[0] || "Default"}</td>
                   <td className="p-3 text-slate-400">
-                    {h.fontSize || "N/A"} / {h.fontWeight || "400"}
+                    {h.fontSize || ""} / {h.fontWeight || "400"}
                   </td>
                 </tr>
               );

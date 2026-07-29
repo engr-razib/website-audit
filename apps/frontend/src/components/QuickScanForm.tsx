@@ -14,7 +14,7 @@ interface QuickScanFormProps {
 
 export function QuickScanForm({ onScanComplete }: QuickScanFormProps) {
   const [url, setUrl] = useState("https://razib.bd");
-  const [findingType, setFindingType] = useState<"font" | "image" | "text" | "cta">("font");
+  const [findingType, setFindingType] = useState<"font" | "image" | "text" | "cta" | "all">("font");
   const [findingValue, setFindingValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

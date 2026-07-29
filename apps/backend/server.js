@@ -12,7 +12,9 @@ const { cleanOutputs } = require('./cleanup_outputs');
 cleanOutputs();
 setInterval(() => {
     cleanOutputs();
-}, 6 * 60 * 60 * 1000);
+}, 6 * 60 * 60 * 1000).unref();
+
+const BROWSERLESS_API_KEY = process.env.BROWSERLESS_API_KEY || (process.env.NODE_ENV === 'production' ? '2UyXC7OcLU2mwm77ae4b055adfcec31aa0333d1979976e9cb' : null);
 
 
 const app = express();
@@ -40,6 +42,33 @@ app.get('/api/health', (req, res) => {
         timestamp: new Date().toISOString(),
         uptime: process.uptime()
     });
+});
+
+/**
+ * 1b. Test Browserless.io API Key Connection Endpoint
+ */
+app.get('/api/health/browserless', async (req, res) => {
+    const keyToTest = process.env.BROWSERLESS_API_KEY || '2UyXC7OcLU2mwm77ae4b055adfcec31aa0333d1979976e9cb';
+
+    try {
+        const { chromium } = require('playwright');
+        console.log("[+] Testing connection to Browserless.io CDP...");
+        const browser = await chromium.connectOverCDP(`wss://chrome.browserless.io?token=${keyToTest}`);
+        const version = browser.version();
+        await browser.close();
+        
+        return res.json({
+            status: 'CONNECTED',
+            message: 'Successfully connected to Browserless.io remote browser!',
+            version
+        });
+    } catch (err) {
+        console.error("[!] Browserless.io connection test failed:", err.message);
+        return res.status(500).json({
+            status: 'FAILED',
+            message: `Failed to connect to Browserless.io: ${err.message}`
+        });
+    }
 });
 
 /**
@@ -83,21 +112,43 @@ app.post('/api/audit/full', async (req, res) => {
     // Asynchronous Execution Queue
     (async () => {
         jobs[jobId].status = 'running';
+
+        let browser = null;
+        try {
+            if (BROWSERLESS_API_KEY) {
+                try {
+                    browser = await chromium.connectOverCDP(`wss://chrome.browserless.io?token=${BROWSERLESS_API_KEY}`);
+                    console.log("[+] Connected to Browserless.io CDP successfully for sitemap & crawling.");
+                } catch (e) {
+                    console.error("[!] Failed to connect to Browserless.io CDP, will try local Playwright:", e.message);
+                }
+            }
+            if (!browser) {
+                try {
+                    browser = await chromium.launch({ headless: true, args: ['--disable-web-security'] });
+                    console.log("[+] Launched local Playwright Chromium successfully for sitemap & crawling.");
+                } catch (e) {
+                    console.warn("[!] Failed to launch local Playwright Chromium. Falling back to static Axios/Cheerio for crawling:", e.message);
+                }
+            }
+        } catch (err) {
+            console.error("[!] Browser initialization crashed, using static fallbacks:", err.message);
+        }
+
         try {
             let targetUrls = [];
             if (urls && Array.isArray(urls) && urls.length > 0) {
                 targetUrls = urls.slice(0, maxPages);
             } else if (crawlUrl) {
-                const crawled = await crawlInternalUrls(crawlUrl, maxPages);
+                const crawled = await crawlInternalUrls(browser, crawlUrl, maxPages);
                 targetUrls = crawled.slice(0, maxPages);
             } else if (sitemapUrl) {
-                const fetched = await fetchSitemapUrls(sitemapUrl);
+                const fetched = await fetchSitemapUrls(browser, sitemapUrl);
                 targetUrls = fetched.slice(0, maxPages);
             }
 
             jobs[jobId].progress.total = targetUrls.length;
 
-            const browser = await chromium.launch({ headless: true, args: ['--disable-web-security'] });
             const pageResults = [];
             const ssCounter = { val: 1 };
 
@@ -111,7 +162,9 @@ app.post('/api/audit/full', async (req, res) => {
                 pageResults.push(res);
             }
 
-            await browser.close();
+            if (browser) {
+                await browser.close();
+            }
 
             // Aggregating Summary Metrics
             const fontMap = new Map();
@@ -219,9 +272,23 @@ app.post('/api/audit/quick-scan', async (req, res) => {
     }
 
     try {
-        const browser = await chromium.launch({ headless: true, args: ['--disable-web-security'] });
+        let browser = null;
+        if (BROWSERLESS_API_KEY) {
+            try {
+                browser = await chromium.connectOverCDP(`wss://chrome.browserless.io?token=${BROWSERLESS_API_KEY}`);
+                console.log("[+] Connected to Browserless.io CDP for quick scan.");
+            } catch (e) {
+                console.error("[!] Failed to connect to Browserless.io, falling back to static parser:", e.message);
+            }
+        } else {
+            console.log("[+] Running quick scan locally using Cheerio.");
+        }
+
         const auditResult = await auditSinglePage(browser, url, findingType, val);
-        await browser.close();
+
+        if (browser) {
+            await browser.close();
+        }
 
         res.json({
             status: 'success',

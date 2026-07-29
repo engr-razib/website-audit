@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { QuickScanForm } from "@/components/QuickScanForm";
 import { FullAuditForm } from "@/components/FullAuditForm";
 import { JobStatusTracker } from "@/components/JobStatusTracker";
@@ -12,8 +12,9 @@ import { HeadingAuditTable } from "@/components/HeadingAuditTable";
 import { TargetMatchesTable } from "@/components/TargetMatchesTable";
 import { DownloadBar } from "@/components/DownloadBar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Type, MousePointer, Image, Heading, Code2, Zap, Globe, Sparkles } from "lucide-react";
+import { Type, MousePointer, Image, Heading, Code2, Zap, Globe, Sparkles, FileText } from "lucide-react";
 import { JobStatusResponse, getJsonDownloadUrl } from "@/lib/api";
+import { PagesAuditedTable } from "@/components/PagesAuditedTable";
 
 export default function AuditDashboardPage() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -22,7 +23,7 @@ export default function AuditDashboardPage() {
   const [mode, setMode] = useState<"quick" | "full">("quick");
 
   // Quick Scan handler
-  const handleQuickScanComplete = (quickScanResult: any) => {
+  const handleQuickScanComplete = useCallback((quickScanResult: any) => {
     setAuditData(quickScanResult);
     setActiveJobId(null);
     // Derive summary metrics for quick scan
@@ -38,17 +39,17 @@ export default function AuditDashboardPage() {
       targetFontElementMatches: (quickScanResult.targetFontElements || []).length,
       targetFontStyleMatches: (quickScanResult.targetFontStylesheets || []).length,
     });
-  };
+  }, []);
 
   // Async job started handler
-  const handleJobStarted = (jobId: string) => {
+  const handleJobStarted = useCallback((jobId: string) => {
     setActiveJobId(jobId);
     setAuditData(null);
     setJobSummary(null);
-  };
+  }, []);
 
   // Async job finished handler
-  const handleJobCompleted = async (jobData: JobStatusResponse) => {
+  const handleJobCompleted = useCallback(async (jobData: JobStatusResponse) => {
     if (jobData.summary) {
       setJobSummary(jobData.summary);
     }
@@ -61,7 +62,7 @@ export default function AuditDashboardPage() {
     } catch (e) {
       console.error("Failed to load completed audit JSON", e);
     }
-  };
+  }, []);
 
   // Calculate normalized display lists
   const fontList = auditData?.fontSummary || auditData?.fonts || [];
@@ -69,6 +70,7 @@ export default function AuditDashboardPage() {
   const missingAltList = auditData?.allMissingAltImages || (auditData?.images || []).filter((i: any) => !i.hasAlt);
   const headingList = auditData?.allHeadings || auditData?.headings || [];
   const targetMatchesList = auditData?.allTargetMatches || auditData?.targetFontElements || [];
+  const pagesList = auditData?.pages || (auditData ? [auditData] : []);
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
@@ -152,6 +154,10 @@ export default function AuditDashboardPage() {
                 <Heading className="h-4 w-4 text-blue-400" />
                 Headings ({headingList.length})
               </TabsTrigger>
+              <TabsTrigger value="pages" className="gap-2">
+                <FileText className="h-4 w-4 text-blue-400" />
+                Pages Audited ({pagesList.length})
+              </TabsTrigger>
               <TabsTrigger value="json" className="gap-2">
                 <Code2 className="h-4 w-4 text-slate-400" />
                 Raw JSON Payload
@@ -176,6 +182,10 @@ export default function AuditDashboardPage() {
 
             <TabsContent value="headings">
               <HeadingAuditTable headings={headingList} />
+            </TabsContent>
+
+            <TabsContent value="pages">
+              <PagesAuditedTable pages={pagesList} />
             </TabsContent>
 
             <TabsContent value="json">

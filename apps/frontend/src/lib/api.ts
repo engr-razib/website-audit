@@ -9,7 +9,7 @@ export interface HealthResponse {
 
 export interface QuickScanRequest {
   url: string;
-  findingType?: 'font' | 'image' | 'text' | 'cta';
+  findingType?: 'font' | 'image' | 'text' | 'cta' | 'all';
   findingValue?: string;
   fontName?: string;
 }
@@ -18,7 +18,7 @@ export interface FullAuditRequest {
   sitemapUrl?: string;
   crawlUrl?: string;
   urls?: string[];
-  findingType?: 'font' | 'image' | 'text' | 'cta';
+  findingType?: 'font' | 'image' | 'text' | 'cta' | 'all';
   findingValue?: string;
   fontName?: string;
   maxPages?: number;
@@ -94,4 +94,15 @@ export function getExcelDownloadUrl(jobId: string): string {
 
 export function getJsonDownloadUrl(jobId: string): string {
   return `${API_BASE}/audit/jobs/${jobId}/download/json`;
+}
+
+export interface BrowserlessStatusResponse {
+  status: 'CONNECTED' | 'FAILED' | 'ERROR';
+  message: string;
+  version?: string;
+}
+
+export async function checkBrowserlessConnection(): Promise<BrowserlessStatusResponse> {
+  const res = await fetch(`${API_BASE}/health/browserless`, { cache: 'no-store' });
+  return res.json().catch(() => ({ status: 'FAILED', message: 'Failed to communicate with test endpoint' }));
 }

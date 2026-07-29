@@ -84,7 +84,7 @@ export function ButtonAuditGrid({ ctas = [] }: ButtonAuditGridProps) {
                 <span className="text-slate-500">Radius:</span> {cta.borderRadius || "0px"}
               </div>
               <div>
-                <span className="text-slate-500">Padding:</span> {cta.padding || "N/A"}
+                <span className="text-slate-500">Padding:</span> {cta.padding || ""}
               </div>
             </div>
           </div>

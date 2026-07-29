@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Activity, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
 import { Progress } from "./ui/progress";
@@ -16,6 +16,12 @@ export function JobStatusTracker({ jobId, onJobComplete }: JobStatusTrackerProps
   const [job, setJob] = useState<JobStatusResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Keep a stable reference to the latest callback to avoid restarting the polling effect
+  const onJobCompleteRef = useRef(onJobComplete);
+  useEffect(() => {
+    onJobCompleteRef.current = onJobComplete;
+  }, [onJobComplete]);
+
   useEffect(() => {
     let timer: NodeJS.Timeout;
 
@@ -25,7 +31,7 @@ export function JobStatusTracker({ jobId, onJobComplete }: JobStatusTrackerProps
         setJob(data);
 
         if (data.status === "completed") {
-          onJobComplete(data);
+          onJobCompleteRef.current(data);
         } else if (data.status === "failed") {
           setError(data.error || "Job failed during execution");
         } else {
@@ -41,7 +47,7 @@ export function JobStatusTracker({ jobId, onJobComplete }: JobStatusTrackerProps
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [jobId, onJobComplete]);
+  }, [jobId]);
 
   if (error) {
     return (

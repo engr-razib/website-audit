@@ -18,7 +18,7 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
   const [crawlUrl, setCrawlUrl] = useState("https://razib.bd");
   const [urlListText, setUrlListText] = useState("https://razib.bd\nhttps://razib.bd/about");
 
-  const [findingType, setFindingType] = useState<"font" | "image" | "text" | "cta">("font");
+  const [findingType, setFindingType] = useState<"font" | "image" | "text" | "cta" | "all">("font");
   const [findingValue, setFindingValue] = useState("");
   const [maxPages, setMaxPages] = useState(5);
   const [loading, setLoading] = useState(false);

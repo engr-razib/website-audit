@@ -243,7 +243,7 @@ async function generateExcelReport(fullAuditData, filePath) {
             const row = matchesSheet.addRow([
                 ++matchIdx,
                 p.url,
-                m.matchType || 'N/A',
+                m.matchType || '',
                 m.tagName,
                 m.selector,
                 m.textSnippet,

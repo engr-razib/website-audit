@@ -86,7 +86,7 @@ export function TargetMatchesTable({ matches = [], jobId = null }: TargetMatches
                       </div>
                     </td>
                     <td className="p-3 max-w-[180px] truncate" title={m.textSnippet}>
-                      {m.textSnippet || "N/A"}
+                      {m.textSnippet || ""}
                     </td>
                     <td className="p-3">
                       <div className="max-h-16 overflow-y-auto text-[10px] font-mono p-1.5 bg-slate-950 rounded border border-slate-900 text-emerald-400 w-64 max-w-xs whitespace-pre-wrap scrollbar-thin">
@@ -100,7 +100,7 @@ export function TargetMatchesTable({ matches = [], jobId = null }: TargetMatches
                     </td>
                     {jobId && (
                       <td className="p-3 text-center">
-                        {m.screenshotName && m.screenshotName !== "N/A" ? (
+                        {m.screenshotName && m.screenshotName !== "N/A" && m.screenshotName !== "" ? (
                           <button
                             type="button"
                             onClick={() => setSelectedScreenshot(`${backendBase}/outputs/${jobId}/${m.screenshotName}`)}
@@ -110,7 +110,7 @@ export function TargetMatchesTable({ matches = [], jobId = null }: TargetMatches
                             View
                           </button>
                         ) : (
-                          <span className="text-[10px] text-slate-500">N/A</span>
+                          <span className="text-[10px] text-slate-500"></span>
                         )}
                       </td>
                     )}
@@ -126,7 +126,7 @@ export function TargetMatchesTable({ matches = [], jobId = null }: TargetMatches
                           <ExternalLink className="h-3 w-3 shrink-0" />
                         </a>
                       ) : (
-                        "N/A"
+                        ""
                       )}
                     </td>
                   </tr>

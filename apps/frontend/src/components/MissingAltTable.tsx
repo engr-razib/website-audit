@@ -49,10 +49,33 @@ export function MissingAltTable({ images = [] }: MissingAltTableProps) {
             <tbody className="divide-y divide-slate-800/60 text-slate-300">
               {images.map((img, idx) => (
                 <tr key={idx} className="hover:bg-slate-900/40 transition-colors">
-                  <td className="p-3 font-mono text-[11px] text-slate-200 max-w-xs truncate">
-                    <div className="flex items-center gap-2">
-                      <Image className="h-4 w-4 text-amber-400 shrink-0" />
-                      <span className="truncate">{img.src || "N/A"}</span>
+                  <td className="p-3 font-mono text-[11px] text-slate-200 max-w-md">
+                    <div className="flex items-center gap-3">
+                      {img.src ? (
+                        <div className="relative h-10 w-10 shrink-0 rounded bg-slate-800 border border-slate-700 overflow-hidden flex items-center justify-center">
+                          <img 
+                            src={img.src} 
+                            alt="Preview" 
+                            className="h-full w-full object-contain hover:scale-125 transition-transform duration-150"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              if (img.url && !target.src.startsWith('http') && !target.src.startsWith('data:')) {
+                                try {
+                                  const base = new URL(img.url).origin;
+                                  target.src = new URL(img.src || '', base).toString();
+                                  return;
+                                } catch (err) {}
+                              }
+                              target.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <Image className="h-5 w-5 text-slate-500 shrink-0" />
+                      )}
+                      <span className="truncate max-w-xs font-semibold text-slate-300" title={img.src}>
+                        {img.src || ""}
+                      </span>
                     </div>
                   </td>
                   <td className="p-3">
@@ -75,7 +98,7 @@ export function MissingAltTable({ images = [] }: MissingAltTableProps) {
                         <ExternalLink className="h-3 w-3 shrink-0" />
                       </a>
                     ) : (
-                      "N/A"
+                      ""
                     )}
                   </td>
                 </tr>

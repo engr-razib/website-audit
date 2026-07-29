@@ -7,12 +7,12 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "node clean.js && turbo run dev",
     "build": "turbo run build",
     "build:cpanel": "node build-cpanel.js",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "clean": "turbo run clean"
+    "clean": "node clean.js"
   },
   "devDependencies": {
     "turbo": "^2.4.0"
