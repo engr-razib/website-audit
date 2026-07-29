@@ -21,9 +21,11 @@ export default function AuditDashboardPage() {
   const [auditData, setAuditData] = useState<any>(null);
   const [jobSummary, setJobSummary] = useState<any>(null);
   const [mode, setMode] = useState<"quick" | "full">("quick");
+  const [submittedFindingValue, setSubmittedFindingValue] = useState<string>("");
 
   // Quick Scan handler
-  const handleQuickScanComplete = useCallback((quickScanResult: any) => {
+  const handleQuickScanComplete = useCallback((quickScanResult: any, findingValue: string) => {
+    setSubmittedFindingValue(findingValue);
     setAuditData(quickScanResult);
     setActiveJobId(null);
     // Derive summary metrics for quick scan
@@ -42,7 +44,8 @@ export default function AuditDashboardPage() {
   }, []);
 
   // Async job started handler
-  const handleJobStarted = useCallback((jobId: string) => {
+  const handleJobStarted = useCallback((jobId: string, findingValue: string) => {
+    setSubmittedFindingValue(findingValue);
     setActiveJobId(jobId);
     setAuditData(null);
     setJobSummary(null);
@@ -132,19 +135,21 @@ export default function AuditDashboardPage() {
       {/* Audit Data Breakdown Tabs */}
       {auditData && (
         <div className="space-y-4">
-          <Tabs defaultValue="matches">
+          <Tabs defaultValue={submittedFindingValue ? "matches" : "fonts"}>
             <TabsList>
-              <TabsTrigger value="matches" className="gap-2">
-                <Sparkles className="h-4 w-4 text-emerald-400" />
-                Finding Matches ({targetMatchesList.length})
-              </TabsTrigger>
+              {submittedFindingValue && (
+                <TabsTrigger value="matches" className="gap-2">
+                  <Sparkles className="h-4 w-4 text-emerald-400" />
+                  Finding Matches ({targetMatchesList.length})
+                </TabsTrigger>
+              )}
               <TabsTrigger value="fonts" className="gap-2">
                 <Type className="h-4 w-4 text-indigo-400" />
                 Font Families ({fontList.length})
               </TabsTrigger>
               <TabsTrigger value="ctas" className="gap-2">
                 <MousePointer className="h-4 w-4 text-purple-400" />
-                CTA Buttons ({ctaList.length})
+                CTA ({ctaList.length})
               </TabsTrigger>
               <TabsTrigger value="images" className="gap-2">
                 <Image className="h-4 w-4 text-amber-400" />
@@ -160,13 +165,15 @@ export default function AuditDashboardPage() {
               </TabsTrigger>
               <TabsTrigger value="json" className="gap-2">
                 <Code2 className="h-4 w-4 text-slate-400" />
-                Raw JSON Payload
+                Payload
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="matches">
-              <TargetMatchesTable matches={targetMatchesList} jobId={activeJobId} />
-            </TabsContent>
+            {submittedFindingValue && (
+              <TabsContent value="matches">
+                <TargetMatchesTable matches={targetMatchesList} jobId={activeJobId} />
+              </TabsContent>
+            )}
 
             <TabsContent value="fonts">
               <FontAuditTable fonts={fontList} />

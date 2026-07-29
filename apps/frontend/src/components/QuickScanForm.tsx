@@ -9,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./ui/
 import { startQuickScan } from "@/lib/api";
 
 interface QuickScanFormProps {
-  onScanComplete: (data: any) => void;
+  onScanComplete: (data: any, findingValue: string) => void;
 }
 
 export function QuickScanForm({ onScanComplete }: QuickScanFormProps) {
@@ -33,7 +33,7 @@ export function QuickScanForm({ onScanComplete }: QuickScanFormProps) {
         findingValue: findingValue || (findingType === "font" ? "Dinot" : "")
       });
       if (res.auditResult) {
-        onScanComplete(res.auditResult);
+        onScanComplete(res.auditResult, findingValue);
       }
     } catch (err: any) {
       setError(err.message || "Failed to scan page");

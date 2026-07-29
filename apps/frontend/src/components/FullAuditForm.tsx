@@ -9,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./ui/
 import { startFullAudit } from "@/lib/api";
 
 interface FullAuditFormProps {
-  onJobStarted: (jobId: string) => void;
+  onJobStarted: (jobId: string, findingValue: string) => void;
 }
 
 export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
@@ -56,7 +56,7 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
     try {
       const res = await startFullAudit(payload);
       if (res.jobId) {
-        onJobStarted(res.jobId);
+        onJobStarted(res.jobId, findingValue);
       }
     } catch (err: any) {
       setError(err.message || "Failed to start full site audit");

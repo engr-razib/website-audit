@@ -14,7 +14,8 @@ setInterval(() => {
     cleanOutputs();
 }, 6 * 60 * 60 * 1000).unref();
 
-const BROWSERLESS_API_KEY = process.env.BROWSERLESS_API_KEY || (process.env.NODE_ENV === 'production' ? '2UyXC7OcLU2mwm77ae4b055adfcec31aa0333d1979976e9cb' : null);
+// Mutable runtime API key — can be updated via POST /api/settings/browserless-key
+let BROWSERLESS_API_KEY = process.env.BROWSERLESS_API_KEY || (process.env.NODE_ENV === 'production' ? '2UyXC7OcLU2mwm77ae4b055adfcec31aa0333d1979976e9cb' : null);
 
 
 const app = express();
@@ -48,27 +49,82 @@ app.get('/api/health', (req, res) => {
  * 1b. Test Browserless.io API Key Connection Endpoint
  */
 app.get('/api/health/browserless', async (req, res) => {
-    const keyToTest = process.env.BROWSERLESS_API_KEY || '2UyXC7OcLU2mwm77ae4b055adfcec31aa0333d1979976e9cb';
+    // Accept key from query param, body, or fall back to configured key
+    const keyToTest = req.query.key || BROWSERLESS_API_KEY;
+
+    if (!keyToTest) {
+        return res.json({
+            status: 'NOT_CONFIGURED',
+            message: 'No Browserless API key configured. Please set your API key.'
+        });
+    }
 
     try {
         const { chromium } = require('playwright');
         console.log("[+] Testing connection to Browserless.io CDP...");
-        const browser = await chromium.connectOverCDP(`wss://chrome.browserless.io?token=${keyToTest}`);
+        const browser = await chromium.connectOverCDP(`wss://chrome.browserless.io?token=${keyToTest}`, { timeout: 10000 });
         const version = browser.version();
         await browser.close();
         
         return res.json({
             status: 'CONNECTED',
             message: 'Successfully connected to Browserless.io remote browser!',
-            version
+            version,
+            keyConfigured: true
         });
     } catch (err) {
         console.error("[!] Browserless.io connection test failed:", err.message);
-        return res.status(500).json({
-            status: 'FAILED',
-            message: `Failed to connect to Browserless.io: ${err.message}`
+        const isAuthError = err.message.includes('403') || err.message.includes('401') || err.message.includes('Unauthorized') || err.message.includes('invalid token');
+        return res.status(200).json({
+            status: isAuthError ? 'INVALID_KEY' : 'FAILED',
+            message: isAuthError 
+                ? 'API key is invalid or expired. Please update your Browserless API key.'
+                : `Failed to connect to Browserless.io: ${err.message}`,
+            keyConfigured: !!BROWSERLESS_API_KEY
         });
     }
+});
+
+/**
+ * 1c. POST /api/settings/browserless-key — Save a new Browserless API key at runtime
+ */
+app.post('/api/settings/browserless-key', async (req, res) => {
+    const { apiKey } = req.body;
+    if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length < 8) {
+        return res.status(400).json({ error: 'A valid API key is required (minimum 8 characters).' });
+    }
+
+    // Test the key before saving
+    try {
+        const { chromium } = require('playwright');
+        console.log("[+] Validating new Browserless API key...");
+        const browser = await chromium.connectOverCDP(`wss://chrome.browserless.io?token=${apiKey.trim()}`, { timeout: 10000 });
+        await browser.close();
+
+        // Key is valid — save it
+        BROWSERLESS_API_KEY = apiKey.trim();
+        console.log("[✓] New Browserless API key saved and verified.");
+        return res.json({ status: 'SAVED', message: 'Browserless API key saved and verified successfully!' });
+    } catch (err) {
+        const isAuthError = err.message.includes('403') || err.message.includes('401') || err.message.includes('Unauthorized') || err.message.includes('invalid token');
+        return res.status(400).json({
+            status: isAuthError ? 'INVALID_KEY' : 'CONNECTION_FAILED',
+            error: isAuthError
+                ? 'The API key appears to be invalid or expired. Please check it and try again.'
+                : `Could not connect to Browserless.io: ${err.message}`
+        });
+    }
+});
+
+/**
+ * 1d. GET /api/settings/browserless-key/status — Get current key status (masked)
+ */
+app.get('/api/settings/browserless-key/status', (req, res) => {
+    if (!BROWSERLESS_API_KEY) {
+        return res.json({ configured: false, maskedKey: null });
+    }
+    const masked = BROWSERLESS_API_KEY.slice(0, 6) + '••••••••' + BROWSERLESS_API_KEY.slice(-4);
+    return res.json({ configured: true, maskedKey: masked });
 });
 
 /**

@@ -97,12 +97,37 @@ export function getJsonDownloadUrl(jobId: string): string {
 }
 
 export interface BrowserlessStatusResponse {
-  status: 'CONNECTED' | 'FAILED' | 'ERROR';
+  status: 'CONNECTED' | 'FAILED' | 'ERROR' | 'NOT_CONFIGURED' | 'INVALID_KEY';
   message: string;
   version?: string;
+  keyConfigured?: boolean;
+}
+
+export interface BrowserlessKeyStatus {
+  configured: boolean;
+  maskedKey: string | null;
 }
 
 export async function checkBrowserlessConnection(): Promise<BrowserlessStatusResponse> {
   const res = await fetch(`${API_BASE}/health/browserless`, { cache: 'no-store' });
   return res.json().catch(() => ({ status: 'FAILED', message: 'Failed to communicate with test endpoint' }));
+}
+
+export async function testBrowserlessKey(apiKey: string): Promise<BrowserlessStatusResponse> {
+  const res = await fetch(`${API_BASE}/health/browserless?key=${encodeURIComponent(apiKey)}`, { cache: 'no-store' });
+  return res.json().catch(() => ({ status: 'FAILED', message: 'Failed to test the API key' }));
+}
+
+export async function saveBrowserlessKey(apiKey: string): Promise<{ status: string; message?: string; error?: string }> {
+  const res = await fetch(`${API_BASE}/settings/browserless-key`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ apiKey }),
+  });
+  return res.json();
+}
+
+export async function getBrowserlessKeyStatus(): Promise<BrowserlessKeyStatus> {
+  const res = await fetch(`${API_BASE}/settings/browserless-key/status`, { cache: 'no-store' });
+  return res.json().catch(() => ({ configured: false, maskedKey: null }));
 }
