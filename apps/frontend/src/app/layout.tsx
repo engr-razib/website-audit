@@ -97,7 +97,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark suppressHydrationWarning">
+    <html lang="en" className="light suppressHydrationWarning">
       <head>
         <script
           type="application/ld+json"

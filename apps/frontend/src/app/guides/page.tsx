@@ -106,7 +106,7 @@ Target Font:     "Dinot" (Or leave empty for ALL fonts)`,
         {
           stepNumber: 1,
           title: "Select 'Quick Scan' Tab in Audit Center",
-          desc: "Navigate to the Audit Control Center (/dashboard) and choose the Single Page Quick Scan mode.",
+          desc: "Navigate to the Audit Control Center (/audit) and choose the Single Page Quick Scan mode.",
         },
         {
           stepNumber: 2,
@@ -253,7 +253,7 @@ Target Font:     "Dinot" (Or leave empty for ALL fonts)`,
       ],
       codeSnippet: `// Example pasted URL List
 https://razib.bd
-https://razib.bd/dashboard
+https://razib.bd/audit
 https://razib.bd/case-study
 https://razib.bd/guides`,
       bestPractices: [
@@ -478,7 +478,7 @@ export default function GuidesPage() {
             </h2>
           </div>
           <Link
-            href="/dashboard"
+            href="/audit"
             className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md transition-all inline-flex items-center gap-2"
           >
             Open Audit Control Center <ArrowRight className="h-4 w-4" />
@@ -628,7 +628,7 @@ export default function GuidesPage() {
 
                 <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <Link
-                    href="/dashboard"
+                    href="/audit"
                     className="inline-flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors group"
                   >
                     Run Live Audit <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
@@ -685,7 +685,7 @@ export default function GuidesPage() {
         </div>
         <div className="flex justify-center">
           <Link
-            href="/dashboard"
+            href="/audit"
             className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-white text-blue-600 hover:bg-slate-100 font-bold text-sm shadow-lg transition-all"
           >
             <Zap className="h-4 w-4 fill-blue-600 text-blue-600" />

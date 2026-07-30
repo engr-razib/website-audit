@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Globe, Layers, Loader2 } from "lucide-react";
+import { Globe, Layers, Loader2, RotateCcw } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Select } from "./ui/select";
@@ -23,6 +23,17 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
   const [maxPages, setMaxPages] = useState(5);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleReset = () => {
+    setUrlMode("sitemap");
+    setSitemapUrl("");
+    setCrawlUrl("");
+    setUrlListText("");
+    setFindingType("font");
+    setFindingValue("");
+    setMaxPages(5);
+    setError(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -215,24 +226,36 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
             </div>
           )}
 
-          <Button
-            type="submit"
-            disabled={loading}
-            variant="default"
-            className="w-full md:w-auto"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Initiating Site Audit...
-              </>
-            ) : (
-              <>
-                <Layers className="mr-2 h-4 w-4" />
-                Start Full Site Audit
-              </>
-            )}
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="submit"
+              disabled={loading}
+              variant="default"
+              className="w-full md:w-auto cursor-pointer"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Initiating Site Audit...
+                </>
+              ) : (
+                <>
+                  <Layers className="mr-2 h-4 w-4" />
+                  Start Full Site Audit
+                </>
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleReset}
+              disabled={loading}
+              className="w-full md:w-auto cursor-pointer border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Reset Form
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>

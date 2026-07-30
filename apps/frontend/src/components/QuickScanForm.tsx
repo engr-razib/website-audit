@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Zap, Search, Loader2 } from "lucide-react";
+import { Zap, Search, Loader2, RotateCcw } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Select } from "./ui/select";
@@ -19,6 +19,13 @@ export function QuickScanForm({ onScanComplete }: QuickScanFormProps) {
   const [findingValue, setFindingValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleReset = () => {
+    setUrl("");
+    setFindingType("font");
+    setFindingValue("");
+    setError(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,26 +122,38 @@ export function QuickScanForm({ onScanComplete }: QuickScanFormProps) {
             </motion.div>
           )}
 
-          <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+          <div className="flex flex-wrap items-center gap-3">
+            <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+              <Button
+                type="submit"
+                disabled={loading}
+                variant="glow"
+                className="w-full md:w-auto cursor-pointer"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Crawling & Analyzing Page...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="mr-2 h-4 w-4" />
+                    Run Quick Scan
+                  </>
+                )}
+              </Button>
+            </motion.div>
             <Button
-              type="submit"
+              type="button"
+              variant="outline"
+              onClick={handleReset}
               disabled={loading}
-              variant="glow"
-              className="w-full md:w-auto cursor-pointer"
+              className="w-full md:w-auto cursor-pointer border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Crawling & Analyzing Page...
-                </>
-              ) : (
-                <>
-                  <Zap className="mr-2 h-4 w-4" />
-                  Run Quick Scan
-                </>
-              )}
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Reset Form
             </Button>
-          </motion.div>
+          </div>
         </form>
       </CardContent>
     </Card>

@@ -84,7 +84,7 @@ export default function LandingPage() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
           <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
             <Link
-              href="/dashboard"
+              href="/audit"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-base shadow-xl shadow-blue-500/25 transition-all transform group cursor-pointer"
             >
               <Zap className="h-5 w-5 fill-white text-white" />
@@ -378,7 +378,7 @@ export default function LandingPage() {
         </p>
         <div>
           <Link
-            href="/dashboard"
+            href="/audit"
             className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-lg shadow-xl shadow-blue-500/30 transition-all transform hover:-translate-y-1 cursor-pointer"
           >
             <Zap className="h-5 w-5 fill-white text-white" />

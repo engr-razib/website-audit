@@ -50,7 +50,7 @@ export interface JobStatusResponse {
   error?: string | null;
 }
 
-export async function checkBackendHealth(): Promise<HealthResponse> {
+export async function checkBackendHealth(): Promise<HealthResponse | null> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 3000);
   try {
@@ -59,14 +59,11 @@ export async function checkBackendHealth(): Promise<HealthResponse> {
       signal: controller.signal
     });
     clearTimeout(timeoutId);
-    if (!res.ok) throw new Error('Backend health check failed');
-    return await res.json();
+    if (!res.ok) return null;
+    return await res.json().catch(() => null);
   } catch (err: any) {
     clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      throw new Error('Backend health check timed out');
-    }
-    throw err;
+    return null;
   }
 }
 

@@ -19,23 +19,40 @@ export function Navbar() {
   const [testMessage, setTestMessage] = useState<string | null>(null);
   const [keyConfigured, setKeyConfigured] = useState(false);
 
+  const [hoveredPath, setHoveredPath] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [showInvalidWarning, setShowInvalidWarning] = useState(false);
 
   // Non-blocking background health check — loads site content first, checks backend in background
   useEffect(() => {
+    let isMounted = true;
     let intervalId: any = null;
 
     const check = async () => {
       try {
-        await checkBackendHealth();
-        setStatus("online");
-        if (intervalId) {
-          clearInterval(intervalId);
-          intervalId = null;
+        const res = await checkBackendHealth();
+        if (!isMounted) return;
+        if (res) {
+          setStatus("online");
+          if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
+        } else {
+          setStatus("offline");
+          if (!intervalId) {
+            intervalId = setInterval(check, 15000);
+          }
         }
       } catch (err) {
+        if (!isMounted) return;
         setStatus("offline");
         if (!intervalId) {
           intervalId = setInterval(check, 15000);
@@ -49,6 +66,7 @@ export function Navbar() {
     }, 100);
 
     return () => {
+      isMounted = false;
       clearTimeout(timer);
       if (intervalId) {
         clearInterval(intervalId);
@@ -58,22 +76,24 @@ export function Navbar() {
 
   // Load key configured status in background once backend is online
   useEffect(() => {
+    let isMounted = true;
     if (status === "online") {
       const timer = setTimeout(() => {
+        if (!isMounted) return;
         setTestStatus("testing");
         syncBrowserlessKeyWithBackend().then(async (s) => {
-          setKeyConfigured(s.configured);
-          if (s.configured) {
+          if (!isMounted) return;
+          setKeyConfigured(s?.configured || false);
+          if (s?.configured) {
             try {
               const data = await checkBrowserlessConnection();
+              if (!isMounted) return;
               if (data.status === "CONNECTED") {
                 setTestStatus("connected");
                 setTestMessage(`Connected! Chrome version: ${data.version}`);
               } else if (data.status === "INVALID_KEY") {
                 setTestStatus("invalid_key");
                 setTestMessage(data.message || "API key is invalid or expired.");
-                setShowInvalidWarning(true);
-                setModalOpen(true);
               } else if (data.status === "NOT_CONFIGURED") {
                 setTestStatus("not_configured");
                 setTestMessage(data.message || "No API key configured.");
@@ -83,16 +103,23 @@ export function Navbar() {
                 setTestMessage(data.message || "Connection failed.");
               }
             } catch {
+              if (!isMounted) return;
               setTestStatus("failed");
               setTestMessage("Failed to check API key connection.");
             }
           } else {
             setTestStatus("idle");
           }
+        }).catch(() => {
+          if (!isMounted) return;
+          setTestStatus("idle");
         });
       }, 200);
 
-      return () => clearTimeout(timer);
+      return () => {
+        isMounted = false;
+        clearTimeout(timer);
+      };
     }
   }, [status]);
 
@@ -289,56 +316,60 @@ export function Navbar() {
           </div>
 
           {/* Main Nav Items */}
-            <nav className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-xl border border-slate-200 dark:border-slate-800/80 text-xs font-medium">
-              
-              <Link
-                href="/"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-                  pathname === "/"
-                    ? "bg-blue-600 text-white shadow-sm font-semibold"
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
-                }`}
-              >
-                <Home className="h-3.5 w-3.5" />
-                Home
-              </Link>
-              <Link
-                href="/dashboard"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-                  pathname === "/dashboard"
-                    ? "bg-blue-600 text-white shadow-sm font-semibold"
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
-                }`}
-              >
-                <LayoutDashboard className="h-3.5 w-3.5" />
-                Audit Center
-              </Link>
-              <Link
-                href="/case-study"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-                  pathname === "/case-study"
-                    ? "bg-blue-600 text-white shadow-sm font-semibold"
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
-                }`}
-              >
-                <BookOpen className="h-3.5 w-3.5" />
-                Case Study
-              </Link>
-              <Link
-                href="/guides"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
-                  pathname === "/guides"
-                    ? "bg-blue-600 text-white shadow-sm font-semibold"
-                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
-                }`}
-              >
-                <FileText className="h-3.5 w-3.5" />
-                Guides
-              </Link>
-              {/* Theme Toggle Button */}
+          <nav 
+            className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-xl border border-slate-200 dark:border-slate-800/80 text-xs font-medium"
+            onMouseLeave={() => setHoveredPath(null)}
+          >
+            {[
+              { label: "Home", href: "/", icon: Home },
+              { label: "Audit Center", href: "/audit", icon: LayoutDashboard },
+              { label: "Case Study", href: "/case-study", icon: BookOpen },
+              { label: "Guides", href: "/guides", icon: FileText },
+            ].map((item) => {
+              const Icon = item.icon;
+              const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(item.href + "/");
+              const isHovered = hoveredPath === item.href;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onMouseEnter={() => setHoveredPath(item.href)}
+                  className={`relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                    active
+                      ? `${!mounted ? "bg-blue-600" : ""} text-white font-semibold`
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  {/* Liquid Active Background Pill */}
+                  {mounted && active && (
+                    <motion.div
+                      layoutId="navbar-active-pill"
+                      className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-md shadow-blue-500/20"
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    />
+                  )}
+
+                  {/* Liquid Hover Pill (for non-active items) */}
+                  {mounted && !active && isHovered && (
+                    <motion.div
+                      layoutId="navbar-hover-pill"
+                      className="absolute inset-0 bg-slate-200/80 dark:bg-slate-800/80 rounded-lg"
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    />
+                  )}
+
+                  <span className="relative z-10 flex items-center gap-1.5">
+                    <Icon className={`h-3.5 w-3.5 ${active ? "text-white" : "text-slate-500 dark:text-slate-400"}`} />
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
+            {/* Theme Toggle Button */}
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer relative z-10"
               title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
               aria-label="Toggle Theme"
             >
@@ -348,7 +379,7 @@ export function Navbar() {
                 <Moon className="h-4 w-4 text-slate-700" />
               )}
             </button>
-            </nav>
+          </nav>
 
           
         </div>

@@ -36,7 +36,7 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/dashboard" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5">
+                <Link href="/audit" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5">
                   <LayoutDashboard className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                   Audit Center
                 </Link>

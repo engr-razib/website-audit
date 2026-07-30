@@ -36,9 +36,9 @@ export function MissingAltTable({ images = [] }: MissingAltTableProps) {
       </div>
 
       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 overflow-hidden shadow-sm dark:shadow-none">
-        <div className="overflow-x-auto">
+        <div className="max-h-[520px] overflow-auto relative">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-100 dark:bg-slate-900/90 text-slate-700 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+            <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 shadow-sm">
               <tr>
                 <th className="p-3 font-semibold">Image Source (src)</th>
                 <th className="p-3 font-semibold">Parent Tag</th>
