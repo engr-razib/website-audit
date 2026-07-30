@@ -66,13 +66,13 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
   };
 
   return (
-    <Card className="border-indigo-900/30 bg-slate-900/80">
+    <Card className="border-slate-200 dark:border-indigo-900/30 bg-white/80 dark:bg-slate-900/80 shadow-md dark:shadow-xl backdrop-blur-xl">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2 text-white">
-          <Globe className="h-5 w-5 text-indigo-400" />
+        <CardTitle className="text-lg flex items-center gap-2 text-slate-900 dark:text-white">
+          <Globe className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
           Full Website Crawler & Audit
         </CardTitle>
-        <CardDescription className="text-slate-400">
+        <CardDescription className="text-slate-600 dark:text-slate-400">
           Crawl sitemap URLs, recursively crawl internal website pages, or scan a custom list of URLs asynchronously.
         </CardDescription>
       </CardHeader>
@@ -80,15 +80,15 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Crawler URL Input Mode */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-slate-300">Crawler Input Mode</label>
-            <div className="flex gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800 self-start w-fit">
+            <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Crawler Input Mode</label>
+            <div className="flex gap-1.5 bg-slate-100 dark:bg-slate-950 p-1 rounded-lg border border-slate-200 dark:border-slate-800 self-start w-fit">
               <button
                 type="button"
                 onClick={() => setUrlMode("sitemap")}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                   urlMode === "sitemap"
                     ? "bg-indigo-600 text-white shadow-sm"
-                    : "text-slate-400 hover:text-white"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 Sitemap XML
@@ -96,10 +96,10 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
               <button
                 type="button"
                 onClick={() => setUrlMode("crawl")}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                   urlMode === "crawl"
                     ? "bg-indigo-600 text-white shadow-sm"
-                    : "text-slate-400 hover:text-white"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 Crawl Website
@@ -107,10 +107,10 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
               <button
                 type="button"
                 onClick={() => setUrlMode("list")}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                   urlMode === "list"
                     ? "bg-indigo-600 text-white shadow-sm"
-                    : "text-slate-400 hover:text-white"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 Enter URL List
@@ -120,10 +120,10 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
 
           <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
             {/* Conditional Input Field based on mode */}
-            <div className="md:col-span-3  space-y-1.5">
+            <div className="md:col-span-3 space-y-1.5">
               {urlMode === "sitemap" && (
                 <>
-                  <label className="text-xs font-medium text-slate-300">XML Sitemap URL</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">XML Sitemap URL</label>
                   <Input
                     value={sitemapUrl}
                     onChange={(e) => setSitemapUrl(e.target.value)}
@@ -134,7 +134,7 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
               )}
               {urlMode === "crawl" && (
                 <>
-                  <label className="text-xs font-medium text-slate-300">Main Website URL</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Main Website URL</label>
                   <Input
                     value={crawlUrl}
                     onChange={(e) => setCrawlUrl(e.target.value)}
@@ -145,12 +145,12 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
               )}
               {urlMode === "list" && (
                 <>
-                  <label className="text-xs font-medium text-slate-300">List of URLs (One per line)</label>
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">List of URLs (One per line)</label>
                   <textarea
                     value={urlListText}
                     onChange={(e) => setUrlListText(e.target.value)}
                     placeholder="https://razib.bd&#10;https://razib.bd/about"
-                    className="flex min-h-[44px] w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3.5 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all font-mono"
+                    className="flex min-h-[44px] w-full rounded-lg border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-950/80 px-3.5 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all font-mono"
                     rows={6}
                     required
                   />
@@ -159,22 +159,21 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
             </div>
 
              <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">Finding Type</label>
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Finding Type</label>
               <Select
                 value={findingType}
                 onChange={(e) => setFindingType(e.target.value as any)}
-                className="bg-slate-950 text-slate-200 border-slate-800"
               >
-                <option value="all" className="bg-slate-900 text-white">All Findings</option>
-                <option value="font" className="bg-slate-900 text-white">Font Family</option>
-                <option value="image" className="bg-slate-900 text-white">Image Name / Src</option>
-                <option value="text" className="bg-slate-900 text-white">Text Content</option>
-                <option value="cta" className="bg-slate-900 text-white">Button with CTA Text</option>
+                <option value="all" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">All Findings</option>
+                <option value="font" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Font Family</option>
+                <option value="image" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Image Name / Src</option>
+                <option value="text" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Text Content</option>
+                <option value="cta" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Button with CTA Text</option>
               </Select>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
                 {findingType === "all" && "Search Substring (Optional)"}
                 {findingType === "font" && "Target Font Family (Optional)"}
                 {findingType === "image" && "Image Filename/URL (Optional)"}
@@ -195,7 +194,7 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
             </div>
           
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">Max Pages (Max 50)</label>
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Max Pages (Max 50)</label>
               <Input
                 type="number"
                 min={1}
@@ -211,7 +210,7 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
           </div>
 
           {error && (
-            <div className="p-3 text-xs rounded-lg bg-red-950/50 border border-red-800/50 text-red-300">
+            <div className="p-3 text-xs rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-300">
               {error}
             </div>
           )}

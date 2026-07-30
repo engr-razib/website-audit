@@ -20,12 +20,12 @@ interface PagesAuditedTableProps {
 export function PagesAuditedTable({ pages = [] }: PagesAuditedTableProps) {
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border border-slate-800 bg-slate-950/60 overflow-hidden">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 overflow-hidden shadow-sm dark:shadow-none">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-900/90 text-slate-400 border-b border-slate-800">
+            <thead className="bg-slate-100 dark:bg-slate-900/90 text-slate-700 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="p-3 font-semibold">Page URL</th>
+                <th className="p-3 font-semibold">Target Page URL</th>
                 <th className="p-3 font-semibold">Audit Engine</th>
                 <th className="p-3 font-semibold text-center">Fonts</th>
                 <th className="p-3 font-semibold text-center">CTAs</th>
@@ -33,7 +33,7 @@ export function PagesAuditedTable({ pages = [] }: PagesAuditedTableProps) {
                 <th className="p-3 font-semibold text-center">Headings</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 text-slate-300">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
               {pages.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-6 text-center text-slate-500">
@@ -47,16 +47,16 @@ export function PagesAuditedTable({ pages = [] }: PagesAuditedTableProps) {
                   const isPlaywright = engine.includes("Playwright");
 
                   return (
-                    <tr key={idx} className="hover:bg-slate-900/40 transition-colors">
-                      <td className="p-3 font-medium text-white max-w-sm truncate">
+                    <tr key={idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/40 transition-colors">
+                      <td className="p-3 font-medium text-slate-900 dark:text-white max-w-sm truncate">
                         <a
                           href={p.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 hover:text-blue-400 hover:underline transition-all"
+                          className="inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-all"
                         >
                           {p.url}
-                          <ExternalLink className="h-3 w-3 shrink-0 opacity-60" />
+                          <ExternalLink className="h-3 w-3 shrink-0 opacity-70" />
                         </a>
                       </td>
                       <td className="p-3">
@@ -65,10 +65,10 @@ export function PagesAuditedTable({ pages = [] }: PagesAuditedTableProps) {
                           {engine}
                         </Badge>
                       </td>
-                      <td className="p-3 text-center font-mono text-slate-400">{(p.fonts || []).length}</td>
-                      <td className="p-3 text-center font-mono text-slate-400">{(p.ctas || []).length}</td>
-                      <td className="p-3 text-center font-mono text-slate-400">{noAltCount}</td>
-                      <td className="p-3 text-center font-mono text-slate-400">{(p.headings || []).length}</td>
+                      <td className="p-3 text-center font-mono text-slate-600 dark:text-slate-400">{(p.fonts || []).length}</td>
+                      <td className="p-3 text-center font-mono text-slate-600 dark:text-slate-400">{(p.ctas || []).length}</td>
+                      <td className="p-3 text-center font-mono text-slate-600 dark:text-slate-400">{noAltCount}</td>
+                      <td className="p-3 text-center font-mono text-slate-600 dark:text-slate-400">{(p.headings || []).length}</td>
                     </tr>
                   );
                 })

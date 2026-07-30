@@ -53,10 +53,10 @@ export function JobStatusTracker({ jobId, onJobComplete }: JobStatusTrackerProps
   if (error) {
     return (
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <Card className="border-red-900/50 bg-red-950/20">
+        <Card className="border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20">
           <CardContent className="p-4 flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 text-red-400 shrink-0" />
-            <div className="text-sm text-red-200">{error}</div>
+            <AlertTriangle className="h-5 w-5 text-red-500 dark:text-red-400 shrink-0" />
+            <div className="text-sm text-red-700 dark:text-red-200">{error}</div>
           </CardContent>
         </Card>
       </motion.div>
@@ -66,10 +66,10 @@ export function JobStatusTracker({ jobId, onJobComplete }: JobStatusTrackerProps
   if (!job) {
     return (
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <Card className="border-slate-800 bg-slate-900/80">
+        <Card className="border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80">
           <CardContent className="p-4 flex items-center gap-3">
-            <Loader2 className="h-5 w-5 text-blue-400 animate-spin shrink-0" />
-            <div className="text-sm text-slate-300">Initializing background crawler task...</div>
+            <Loader2 className="h-5 w-5 text-blue-500 dark:text-blue-400 animate-spin shrink-0" />
+            <div className="text-sm text-slate-700 dark:text-slate-300">Initializing background crawler task...</div>
           </CardContent>
         </Card>
       </motion.div>
@@ -81,16 +81,16 @@ export function JobStatusTracker({ jobId, onJobComplete }: JobStatusTrackerProps
 
   return (
     <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }}>
-      <Card className="border-blue-900/40 bg-slate-900/90 glow-blue overflow-hidden">
+      <Card className="border-blue-200 dark:border-blue-900/40 bg-white/90 dark:bg-slate-900/90 shadow-md dark:shadow-xl overflow-hidden">
         <CardContent className="p-5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {isCompleted ? (
-                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                <CheckCircle2 className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
               ) : (
-                <Activity className="h-5 w-5 text-blue-400 animate-spin" />
+                <Activity className="h-5 w-5 text-blue-500 dark:text-blue-400 animate-spin" />
               )}
-              <span className="text-sm font-semibold text-white">
+              <span className="text-sm font-semibold text-slate-900 dark:text-white">
                 {isCompleted ? "Audit Completed Successfully" : `Crawling Page ${progress.current} of ${progress.total}`}
               </span>
             </div>
@@ -101,7 +101,7 @@ export function JobStatusTracker({ jobId, onJobComplete }: JobStatusTrackerProps
 
           <Progress value={progress.percent} />
 
-          <div className="text-xs text-slate-400 flex justify-between truncate">
+          <div className="text-xs text-slate-600 dark:text-slate-400 flex justify-between truncate">
             <span className="truncate max-w-lg">
               {progress.currentUrl ? `Current: ${progress.currentUrl}` : `Job ID: ${jobId}`}
             </span>

@@ -236,9 +236,13 @@ app.post('/api/audit/full', async (req, res) => {
                 (p.fonts || []).forEach(f => {
                     const key = f.rawFontFamily;
                     if (!fontMap.has(key)) {
-                        fontMap.set(key, { ...f, pageCount: 1 });
+                        fontMap.set(key, { ...f, pageCount: 1, url: p.url, urls: [p.url] });
                     } else {
-                        fontMap.get(key).pageCount++;
+                        const existing = fontMap.get(key);
+                        existing.pageCount++;
+                        if (existing.urls && !existing.urls.includes(p.url)) {
+                            existing.urls.push(p.url);
+                        }
                     }
                 });
 
@@ -435,7 +439,7 @@ const frontendStaticPaths = [
 for (const staticDir of frontendStaticPaths) {
     if (fs.existsSync(staticDir)) {
         app.use(express.static(staticDir));
-        app.get('*', (req, res, next) => {
+        app.get(/.*/, (req, res, next) => {
             if (req.path.startsWith('/api') || req.path.startsWith('/outputs')) return next();
             
             // Check direct file (e.g. /dashboard.html)

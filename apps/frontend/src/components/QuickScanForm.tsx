@@ -44,13 +44,13 @@ export function QuickScanForm({ onScanComplete }: QuickScanFormProps) {
   };
 
   return (
-    <Card className="border-blue-900/30 bg-slate-900/80 shadow-xl backdrop-blur-xl">
+    <Card className="border-blue-200 dark:border-blue-900/30 bg-white/80 dark:bg-slate-900/80 shadow-md dark:shadow-xl backdrop-blur-xl">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2 text-white">
-          <Zap className="h-5 w-5 text-amber-400 fill-amber-400/20" />
+        <CardTitle className="text-lg flex items-center gap-2 text-slate-900 dark:text-white">
+          <Zap className="h-5 w-5 text-amber-500 fill-amber-500/20" />
           Single Page Quick Scan
         </CardTitle>
-        <CardDescription className="text-slate-400">
+        <CardDescription className="text-slate-600 dark:text-slate-400">
           Run an instant synchronous audit on any single URL to analyze fonts, CTAs, alt tags, and SEO tags.
         </CardDescription>
       </CardHeader>
@@ -58,9 +58,9 @@ export function QuickScanForm({ onScanComplete }: QuickScanFormProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div className="md:col-span-2 space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">Target Page URL</label>
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Target Page URL</label>
               <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-slate-500" />
                 <Input
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
@@ -71,21 +71,20 @@ export function QuickScanForm({ onScanComplete }: QuickScanFormProps) {
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">Finding Type</label>
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Finding Type</label>
               <Select
                 value={findingType}
                 onChange={(e) => setFindingType(e.target.value as any)}
-                className="bg-slate-950 text-slate-200 border-slate-800"
               >
-                <option value="all" className="bg-slate-900 text-white">All Findings</option>
-                <option value="font" className="bg-slate-900 text-white">Font Family</option>
-                <option value="image" className="bg-slate-900 text-white">Image Name / Src</option>
-                <option value="text" className="bg-slate-900 text-white">Text Content</option>
-                <option value="cta" className="bg-slate-900 text-white">Button with CTA Text</option>
+                <option value="all" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">All Findings</option>
+                <option value="font" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Font Family</option>
+                <option value="image" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Image Name / Src</option>
+                <option value="text" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Text Content</option>
+                <option value="cta" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">Button with CTA Text</option>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-300">
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
                 {findingType === "all" && "Search Substring (Optional)"}
                 {findingType === "font" && "Target Font Family (Optional)"}
                 {findingType === "image" && "Image Filename/URL (Optional)"}
@@ -110,7 +109,7 @@ export function QuickScanForm({ onScanComplete }: QuickScanFormProps) {
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
-              className="p-3 text-xs rounded-lg bg-red-950/50 border border-red-800/50 text-red-300"
+              className="p-3 text-xs rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-300"
             >
               {error}
             </motion.div>

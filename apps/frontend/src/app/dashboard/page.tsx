@@ -13,10 +13,11 @@ import { MissingAltTable } from "@/components/MissingAltTable";
 import { HeadingAuditTable } from "@/components/HeadingAuditTable";
 import { TargetMatchesTable } from "@/components/TargetMatchesTable";
 import { DownloadBar } from "@/components/DownloadBar";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Type, MousePointer, Image, Heading, Code2, Zap, Globe, Sparkles, FileText, ArrowLeft } from "lucide-react";
-import { JobStatusResponse, getJsonDownloadUrl } from "@/lib/api";
 import { PagesAuditedTable } from "@/components/PagesAuditedTable";
+import { SeoAuditTable } from "@/components/SeoAuditTable";
+import { Type, MousePointer, Image, Heading, Code2, Zap, Globe, Sparkles, FileText, ArrowLeft, SearchCheck } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { JobStatusResponse, getJsonDownloadUrl } from "@/lib/api";
 
 export default function AuditDashboardPage() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -70,12 +71,19 @@ export default function AuditDashboardPage() {
   }, []);
 
   // Calculate normalized display lists
-  const fontList = auditData?.fontSummary || auditData?.fonts || [];
-  const ctaList = auditData?.allCTAs || auditData?.ctas || [];
-  const missingAltList = auditData?.allMissingAltImages || (auditData?.images || []).filter((i: any) => !i.hasAlt);
-  const headingList = auditData?.allHeadings || auditData?.headings || [];
-  const targetMatchesList = auditData?.allTargetMatches || auditData?.targetFontElements || [];
+  const fontList = (auditData?.fontSummary || auditData?.fonts || []).map((f: any) => ({
+    ...f,
+    url: f.url || (f.urls ? f.urls[0] : auditData?.url),
+    urls: f.urls || (f.url ? [f.url] : (auditData?.url ? [auditData.url] : []))
+  }));
+  const ctaList = (auditData?.allCTAs || auditData?.ctas || []).map((c: any) => ({ ...c, url: c.url || auditData?.url }));
+  const missingAltList = (auditData?.allMissingAltImages || (auditData?.images || []).filter((i: any) => !i.hasAlt)).map((img: any) => ({ ...img, url: img.url || auditData?.url }));
+  const headingList = (auditData?.allHeadings || auditData?.headings || []).map((h: any) => ({ ...h, url: h.url || auditData?.url }));
+  const targetMatchesList = (auditData?.allTargetMatches || auditData?.targetFontElements || []).map((m: any) => ({ ...m, url: m.url || auditData?.url }));
   const pagesList = auditData?.pages || (auditData ? [auditData] : []);
+  const seoList = auditData?.pages
+    ? auditData.pages.map((p: any) => ({ url: p.url, ...p.seo }))
+    : (auditData?.seo ? [{ url: auditData.url, ...auditData.seo }] : []);
 
   return (
     <motion.div
@@ -189,6 +197,10 @@ export default function AuditDashboardPage() {
                 <Heading className="h-4 w-4 text-blue-500 dark:text-blue-400" />
                 Headings ({headingList.length})
               </TabsTrigger>
+              <TabsTrigger value="seo" className="gap-2">
+                <SearchCheck className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
+                SEO Rules Audit ({seoList.length})
+              </TabsTrigger>
               <TabsTrigger value="pages" className="gap-2">
                 <FileText className="h-4 w-4 text-blue-500 dark:text-blue-400" />
                 Pages Audited ({pagesList.length})
@@ -219,6 +231,10 @@ export default function AuditDashboardPage() {
 
             <TabsContent value="headings">
               <HeadingAuditTable headings={headingList} />
+            </TabsContent>
+
+            <TabsContent value="seo">
+              <SeoAuditTable seoList={seoList} />
             </TabsContent>
 
             <TabsContent value="pages">
