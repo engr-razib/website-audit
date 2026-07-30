@@ -118,9 +118,9 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
             {/* Conditional Input Field based on mode */}
-            <div className="md:col-span-2 space-y-1.5">
+            <div className="md:col-span-3  space-y-1.5">
               {urlMode === "sitemap" && (
                 <>
                   <label className="text-xs font-medium text-slate-300">XML Sitemap URL</label>
@@ -151,7 +151,7 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
                     onChange={(e) => setUrlListText(e.target.value)}
                     placeholder="https://razib.bd&#10;https://razib.bd/about"
                     className="flex min-h-[44px] w-full rounded-lg border border-slate-800 bg-slate-950/80 px-3.5 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-50 transition-all font-mono"
-                    rows={1}
+                    rows={6}
                     required
                   />
                 </>
@@ -193,9 +193,7 @@ export function FullAuditForm({ onJobStarted }: FullAuditFormProps) {
                 }
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-slate-300">Max Pages (Max 50)</label>
               <Input

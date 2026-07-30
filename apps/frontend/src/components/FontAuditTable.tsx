@@ -78,14 +78,24 @@ export function FontAuditTable({ fonts = [] }: FontAuditTableProps) {
                         ) : (
                           <Sparkles className="h-4 w-4 text-blue-400 shrink-0" />
                         )}
-                        <span>{name}</span>
+                        {name?.trim() ? (
+                            <ul className="text-wrap list-decimal list-inside">
+                              {name
+                                .split(',')
+                                .map((item) => item.trim())
+                                .filter(Boolean)
+                                .map((item, index) => (
+                                  <li key={index}>{item}</li>
+                                ))}
+                            </ul>
+                          ) : null}
                       </td>
-                      <td className="p-3">
+                      <td className="p-3 w-[20%] overflow-hidden truncate" title={font.licenseType || font.category || (isPremium ? "Premium Font" : "Free / Standard")}>
                         <Badge variant={isPremium ? "warning" : "success"}>
                           {font.licenseType || font.category || (isPremium ? "Premium Font" : "Free / Standard")}
                         </Badge>
                       </td>
-                      <td className="p-3 text-slate-400">{font.usageContext || "Rendered DOM Elements"}</td>
+                      <td className="p-3 text-slate-400 overflow-hidden truncate" title={font.usageContext || "Rendered DOM Elements"}>{font.usageContext || "Rendered DOM Elements"}</td>
                       <td className="p-3">
                         <span className="font-semibold text-white">{font.pageCount || 1}</span> page(s)
                       </td>

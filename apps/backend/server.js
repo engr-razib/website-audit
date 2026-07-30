@@ -15,7 +15,7 @@ setInterval(() => {
 }, 6 * 60 * 60 * 1000).unref();
 
 // Mutable runtime API key — can be updated via POST /api/settings/browserless-key
-let BROWSERLESS_API_KEY = process.env.BROWSERLESS_API_KEY || (process.env.NODE_ENV === 'production' ? '2UyXC7OcLU2mwm77ae4b055adfcec31aa0333d1979976e9cb' : null);
+let BROWSERLESS_API_KEY = process.env.BROWSERLESS_API_KEY || '';
 
 
 const app = express();
@@ -424,6 +424,38 @@ app.post('/api/audit/outputs/cleanup', (req, res) => {
         removedItemsCount: removedCount
     });
 });
+
+// Serve frontend static files if present and handle SPA client-side routing on page reload
+const frontendStaticPaths = [
+    path.join(__dirname, 'public_html'),
+    path.join(__dirname, '../frontend/out'),
+    path.join(__dirname, '../frontend')
+];
+
+for (const staticDir of frontendStaticPaths) {
+    if (fs.existsSync(staticDir)) {
+        app.use(express.static(staticDir));
+        app.get('*', (req, res, next) => {
+            if (req.path.startsWith('/api') || req.path.startsWith('/outputs')) return next();
+            
+            // Check direct file (e.g. /dashboard.html)
+            const cleanPath = req.path.endsWith('/') ? req.path.slice(0, -1) : req.path;
+            const htmlFile = path.join(staticDir, `${cleanPath}.html`);
+            if (fs.existsSync(htmlFile)) return res.sendFile(htmlFile);
+
+            // Check subfolder index (e.g. /dashboard/index.html)
+            const subIndexFile = path.join(staticDir, cleanPath, 'index.html');
+            if (fs.existsSync(subIndexFile)) return res.sendFile(subIndexFile);
+
+            // Fallback to main index.html
+            const rootIndex = path.join(staticDir, 'index.html');
+            if (fs.existsSync(rootIndex)) return res.sendFile(rootIndex);
+            
+            next();
+        });
+        break;
+    }
+}
 
 const server = app.listen(PORT, () => {
     console.log(`=======================================================`);

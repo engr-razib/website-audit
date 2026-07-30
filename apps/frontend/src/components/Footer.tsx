@@ -1,36 +1,164 @@
 "use client";
 
 import React from "react";
-import { Heart, ExternalLink, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { Heart, ExternalLink, Sparkles, BookOpen, FileText, Home, LayoutDashboard } from "lucide-react";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="w-full border-t border-slate-800/80 bg-slate-950/90 backdrop-blur-xl py-6 text-xs text-slate-400">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
-            <Sparkles className="h-3.5 w-3.5" />
+    <footer className="w-full border-t border-slate-200 dark:border-slate-800/80 bg-white/90 dark:bg-slate-950/90 backdrop-blur-xl pt-12 pb-8 text-xs text-slate-600 dark:text-slate-400 transition-colors">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-8">
+        {/* Footer Navigation Columns */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
+          {/* Brand Info */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <span className="font-bold text-slate-900 dark:text-white text-sm">Website Audit</span>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Full website quality platform automating font licensing, CTA token auditing, accessibility compliance, and Excel report generation.
+            </p>
           </div>
-          <span>
-            © {currentYear} Website Audit AI. All rights reserved.
-          </span>
+
+          {/* Navigation Links */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-200">Platform Pages</h4>
+            <ul className="space-y-2 text-xs">
+              <li>
+                <Link href="/" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5">
+                  <Home className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                  Home
+                </Link>
+              </li>
+              <li>
+                <Link href="/dashboard" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5">
+                  <LayoutDashboard className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                  Audit Center
+                </Link>
+              </li>
+              <li>
+                <Link href="/case-study" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5 font-medium text-blue-600 dark:text-blue-400">
+                  <BookOpen className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                  Website Case Study (STAR)
+                </Link>
+              </li>
+              <li>
+                <Link href="/guides" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5 font-medium text-indigo-600 dark:text-indigo-400">
+                  <FileText className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                  Audit &amp; Compliance Guides
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Audit Capabilities */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-200">Audit Suites</h4>
+            <ul className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
+              <li className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                Font Classification &amp; Licensing
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                CTA Design Token Inspector
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                Missing Alt Tag Compliance
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                Multi-Sheet Excel Export (.xlsx)
+              </li>
+            </ul>
+          </div>
+
+          {/* Developer / Contact */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-200">Contact &amp; Customization</h4>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Have an idea or need custom website auditing features? Let&apos;s talk.
+            </p>
+            <div className="space-y-1.5 pt-1">
+              <div>
+                <a
+                  href="mailto:razibdpi@gmail.com"
+                  className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline font-semibold"
+                >
+                  ✉ razibdpi@gmail.com
+                </a>
+              </div>
+              <div>
+                <a
+                  href="https://www.razib.bd/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs text-slate-900 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-semibold"
+                >
+                  🌐 Md. Razib Hossain (www.razib.bd)
+                  <ExternalLink className="h-3 w-3 text-slate-400" />
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 text-slate-300">
-          <span>Developed with</span>
-          <Heart className="h-3.5 w-3.5 text-red-500 fill-red-500" />
-          <span>by</span>
-          <a
-            href="https://razib.bd/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold text-white hover:text-blue-400 transition-colors inline-flex items-center gap-1 group underline underline-offset-4 decoration-blue-500/50"
-          >
-            Md. Razib Hossain
-            <ExternalLink className="h-3 w-3 text-slate-400 group-hover:text-blue-400 transition-colors" />
-          </a>
+        {/* Value Highlights Banner */}
+        <div className="pt-6 border-t border-slate-200 dark:border-slate-800/80 space-y-3">
+          <h5 className="text-center font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-slate-200">
+            Built for speed. Designed for everyone.
+          </h5>
+          <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] font-medium text-slate-700 dark:text-slate-300">
+            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
+              <span className="text-emerald-500 font-bold">✓</span> Free Forever
+            </span>
+            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
+              <span className="text-emerald-500 font-bold">✓</span> No Signup
+            </span>
+            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
+              <span className="text-emerald-500 font-bold">✓</span> Private in Browser
+            </span>
+            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
+              <span className="text-emerald-500 font-bold">✓</span> Unlimited Use
+            </span>
+            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
+              <span className="text-emerald-500 font-bold">✓</span> No Watermarks
+            </span>
+            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
+              <span className="text-emerald-500 font-bold">✓</span> Mobile Friendly
+            </span>
+            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
+              <span className="text-emerald-500 font-bold">✓</span> Instant Excel Downloads
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom copyright bar */}
+        <div className="pt-6 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <span>
+            © {currentYear} Website Audit. All rights reserved.
+          </span>
+
+          <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+            <span>Developed with</span>
+            <Heart className="h-3.5 w-3.5 text-red-500 fill-red-500" />
+            <span>by</span>
+            <a
+              href="https://razib.bd/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-flex items-center gap-1 group underline underline-offset-4 decoration-blue-500/50"
+            >
+              Md. Razib Hossain
+              <ExternalLink className="h-3 w-3 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+            </a>
+          </div>
         </div>
       </div>
     </footer>

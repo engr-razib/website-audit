@@ -51,41 +51,73 @@ export interface JobStatusResponse {
 }
 
 export async function checkBackendHealth(): Promise<HealthResponse> {
-  const res = await fetch(`${API_BASE}/health`, { cache: 'no-store' });
-  if (!res.ok) throw new Error('Backend health check failed');
-  return res.json();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000);
+  try {
+    const res = await fetch(`${API_BASE}/health`, { 
+      cache: 'no-store',
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) throw new Error('Backend health check failed');
+    return await res.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Backend health check timed out');
+    }
+    throw err;
+  }
 }
 
 export async function startQuickScan(data: QuickScanRequest): Promise<any> {
-  const res = await fetch(`${API_BASE}/audit/quick-scan`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Quick scan request failed' }));
-    throw new Error(err.error || 'Quick scan failed');
+  try {
+    const res = await fetch(`${API_BASE}/audit/quick-scan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Quick scan request failed' }));
+      throw new Error(err.error || 'Quick scan failed');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message && err.message !== 'Failed to fetch') {
+      throw err;
+    }
+    throw new Error('Backend server is offline or unreachable. Please start the backend server to run live scans.');
   }
-  return res.json();
 }
 
 export async function startFullAudit(data: FullAuditRequest): Promise<{ jobId: string; statusUrl: string }> {
-  const res = await fetch(`${API_BASE}/audit/full`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Full audit request failed' }));
-    throw new Error(err.error || 'Full audit failed');
+  try {
+    const res = await fetch(`${API_BASE}/audit/full`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Full audit request failed' }));
+      throw new Error(err.error || 'Full audit failed');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message && err.message !== 'Failed to fetch') {
+      throw err;
+    }
+    throw new Error('Backend server is offline or unreachable. Please start the backend server to run live audits.');
   }
-  return res.json();
 }
 
 export async function getJobStatus(jobId: string): Promise<JobStatusResponse> {
-  const res = await fetch(`${API_BASE}/audit/jobs/${jobId}`, { cache: 'no-store' });
-  if (!res.ok) throw new Error('Failed to fetch job status');
-  return res.json();
+  try {
+    const res = await fetch(`${API_BASE}/audit/jobs/${jobId}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('Failed to fetch job status');
+    return await res.json();
+  } catch (err: any) {
+    throw new Error(err.message === 'Failed to fetch' ? 'Backend server is offline' : err.message || 'Failed to fetch job status');
+  }
 }
 
 export function getExcelDownloadUrl(jobId: string): string {
@@ -108,26 +140,92 @@ export interface BrowserlessKeyStatus {
   maskedKey: string | null;
 }
 
+const BROWSERLESS_STORAGE_KEY = 'browserless_api_key';
+
+export function getStoredBrowserlessKey(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(BROWSERLESS_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredBrowserlessKey(apiKey: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(BROWSERLESS_STORAGE_KEY, apiKey);
+  } catch (err) {
+    console.error('Failed to save Browserless key to localStorage:', err);
+  }
+}
+
+export function removeStoredBrowserlessKey(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(BROWSERLESS_STORAGE_KEY);
+  } catch (err) {
+    console.error('Failed to remove Browserless key from localStorage:', err);
+  }
+}
+
 export async function checkBrowserlessConnection(): Promise<BrowserlessStatusResponse> {
-  const res = await fetch(`${API_BASE}/health/browserless`, { cache: 'no-store' });
-  return res.json().catch(() => ({ status: 'FAILED', message: 'Failed to communicate with test endpoint' }));
+  try {
+    const res = await fetch(`${API_BASE}/health/browserless`, { cache: 'no-store' });
+    return await res.json().catch(() => ({ status: 'FAILED', message: 'Failed to communicate with test endpoint' }));
+  } catch {
+    return { status: 'FAILED', message: 'Backend server is offline' };
+  }
 }
 
 export async function testBrowserlessKey(apiKey: string): Promise<BrowserlessStatusResponse> {
-  const res = await fetch(`${API_BASE}/health/browserless?key=${encodeURIComponent(apiKey)}`, { cache: 'no-store' });
-  return res.json().catch(() => ({ status: 'FAILED', message: 'Failed to test the API key' }));
+  try {
+    const res = await fetch(`${API_BASE}/health/browserless?key=${encodeURIComponent(apiKey)}`, { cache: 'no-store' });
+    return await res.json().catch(() => ({ status: 'FAILED', message: 'Failed to test the API key' }));
+  } catch {
+    return { status: 'FAILED', message: 'Backend server is offline' };
+  }
 }
 
 export async function saveBrowserlessKey(apiKey: string): Promise<{ status: string; message?: string; error?: string }> {
-  const res = await fetch(`${API_BASE}/settings/browserless-key`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ apiKey }),
-  });
-  return res.json();
+  try {
+    const res = await fetch(`${API_BASE}/settings/browserless-key`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey }),
+    });
+    const data = await res.json();
+    if (data.status === 'SAVED') {
+      setStoredBrowserlessKey(apiKey);
+    }
+    return data;
+  } catch {
+    return { status: 'FAILED', error: 'Backend server is offline' };
+  }
 }
 
 export async function getBrowserlessKeyStatus(): Promise<BrowserlessKeyStatus> {
-  const res = await fetch(`${API_BASE}/settings/browserless-key/status`, { cache: 'no-store' });
-  return res.json().catch(() => ({ configured: false, maskedKey: null }));
+  try {
+    const res = await fetch(`${API_BASE}/settings/browserless-key/status`, { cache: 'no-store' });
+    if (!res.ok) return { configured: false, maskedKey: null };
+    return await res.json().catch(() => ({ configured: false, maskedKey: null }));
+  } catch {
+    return { configured: false, maskedKey: null };
+  }
 }
+
+export async function syncBrowserlessKeyWithBackend(): Promise<BrowserlessKeyStatus> {
+  const storedKey = getStoredBrowserlessKey();
+  if (storedKey) {
+    try {
+      const status = await getBrowserlessKeyStatus();
+      if (!status.configured) {
+        await saveBrowserlessKey(storedKey);
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return getBrowserlessKeyStatus();
+}
+

@@ -40,6 +40,11 @@ try {
   const frontendDest = path.join(distDir, 'frontend');
   fs.cpSync(frontendSrc, frontendDest, { recursive: true });
 
+  const htaccessSrc = path.join(rootDir, 'apps', 'frontend', 'public', '.htaccess');
+  if (fs.existsSync(htaccessSrc)) {
+    fs.copyFileSync(htaccessSrc, path.join(frontendDest, '.htaccess'));
+  }
+
   console.log('\n✅ Build completed successfully!');
   console.log(`📁 Deployment files are ready in: ${distDir}`);
   console.log('   - backend/: Zip this folder and upload to your cPanel Node.js Application root.');

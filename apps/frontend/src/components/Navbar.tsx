@@ -1,12 +1,19 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { ShieldCheck, Server, Sparkles, Activity, Globe, Key } from "lucide-react";
-import { checkBackendHealth, API_BASE, checkBrowserlessConnection, getBrowserlessKeyStatus } from "@/lib/api";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Server, Sparkles, Activity, Globe, Key, Home, LayoutDashboard, BookOpen, FileText, Sun, Moon } from "lucide-react";
+import { checkBackendHealth, API_BASE, checkBrowserlessConnection, getBrowserlessKeyStatus, syncBrowserlessKeyWithBackend } from "@/lib/api";
+import { motion } from "framer-motion";
 import { Badge } from "./ui/badge";
 import { BrowserlessKeyModal } from "./BrowserlessKeyModal";
+import { useTheme } from "./ThemeProvider";
 
 export function Navbar() {
+  const pathname = usePathname();
+  const { theme, toggleTheme } = useTheme();
+
   const [status, setStatus] = useState<"checking" | "online" | "offline">("checking");
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "connected" | "failed" | "not_configured" | "invalid_key">("idle");
   const [testMessage, setTestMessage] = useState<string | null>(null);
@@ -16,7 +23,7 @@ export function Navbar() {
   const [modalOpen, setModalOpen] = useState(false);
   const [showInvalidWarning, setShowInvalidWarning] = useState(false);
 
-  // Backend health check
+  // Non-blocking background health check — loads site content first, checks backend in background
   useEffect(() => {
     let intervalId: any = null;
 
@@ -36,52 +43,89 @@ export function Navbar() {
       }
     };
 
-    check();
+    // Defer check to background after site DOM renders
+    const timer = setTimeout(() => {
+      check();
+    }, 100);
 
     return () => {
+      clearTimeout(timer);
       if (intervalId) {
         clearInterval(intervalId);
       }
     };
   }, []);
 
-  // Load key configured status once backend is online
+  // Load key configured status in background once backend is online
   useEffect(() => {
     if (status === "online") {
-      getBrowserlessKeyStatus().then((s) => setKeyConfigured(s.configured));
+      const timer = setTimeout(() => {
+        setTestStatus("testing");
+        syncBrowserlessKeyWithBackend().then(async (s) => {
+          setKeyConfigured(s.configured);
+          if (s.configured) {
+            try {
+              const data = await checkBrowserlessConnection();
+              if (data.status === "CONNECTED") {
+                setTestStatus("connected");
+                setTestMessage(`Connected! Chrome version: ${data.version}`);
+              } else if (data.status === "INVALID_KEY") {
+                setTestStatus("invalid_key");
+                setTestMessage(data.message || "API key is invalid or expired.");
+                setShowInvalidWarning(true);
+                setModalOpen(true);
+              } else if (data.status === "NOT_CONFIGURED") {
+                setTestStatus("not_configured");
+                setTestMessage(data.message || "No API key configured.");
+                setKeyConfigured(false);
+              } else {
+                setTestStatus("failed");
+                setTestMessage(data.message || "Connection failed.");
+              }
+            } catch {
+              setTestStatus("failed");
+              setTestMessage("Failed to check API key connection.");
+            }
+          } else {
+            setTestStatus("idle");
+          }
+        });
+      }, 200);
+
+      return () => clearTimeout(timer);
     }
   }, [status]);
 
-  const handleTestBrowserless = useCallback(async () => {
-    setTestStatus("testing");
-    setTestMessage(null);
-    try {
-      const data = await checkBrowserlessConnection();
-      if (data.status === "CONNECTED") {
-        setTestStatus("connected");
-        setTestMessage(`Connected! Chrome version: ${data.version}`);
-        setKeyConfigured(true);
-      } else if (data.status === "NOT_CONFIGURED") {
-        setTestStatus("not_configured");
-        setTestMessage("No API key configured. Click 'Set API Key' to add one.");
-        setShowInvalidWarning(false);
-        setModalOpen(true);
-      } else if (data.status === "INVALID_KEY") {
-        setTestStatus("invalid_key");
-        setTestMessage(data.message || "API key is invalid or expired.");
-        setShowInvalidWarning(true);
-        setModalOpen(true);
-      } else {
-        setTestStatus("failed");
-        setTestMessage(data.message || "Connection failed.");
-        setShowInvalidWarning(true);
-        setModalOpen(true);
-      }
-    } catch (err: any) {
-      setTestStatus("failed");
-      setTestMessage("Failed to connect to API endpoint");
-    }
-  }, []);
+  // const handleTestBrowserless = useCallback(async () => {
+  //   setTestStatus("testing");
+  //   setTestMessage(null);
+  //   try {
+  //     const data = await checkBrowserlessConnection();
+  //     if (data.status === "CONNECTED") {
+  //       setTestStatus("connected");
+  //       setTestMessage(`Connected! Chrome version: ${data.version}`);
+  //       setKeyConfigured(true);
+  //     } else if (data.status === "NOT_CONFIGURED") {
+  //       setTestStatus("not_configured");
+  //       setTestMessage("No API key configured. Click 'Set API Key' to add one.");
+  //       setShowInvalidWarning(false);
+  //       setModalOpen(true);
+  //     } else if (data.status === "INVALID_KEY") {
+  //       setTestStatus("invalid_key");
+  //       setTestMessage(data.message || "API key is invalid or expired.");
+  //       setShowInvalidWarning(true);
+  //       setModalOpen(true);
+  //     } else {
+  //       setTestStatus("failed");
+  //       setTestMessage(data.message || "Connection failed.");
+  //       setShowInvalidWarning(true);
+  //       setModalOpen(true);
+  //     }
+  //   } catch (err: any) {
+  //     setTestStatus("failed");
+  //     setTestMessage("Failed to connect to API endpoint");
+  //   }
+  // }, []);
 
   const handleOpenKeyModal = () => {
     setShowInvalidWarning(false);
@@ -90,18 +134,25 @@ export function Navbar() {
 
   const handleKeySaved = async () => {
     setModalOpen(false);
-    setKeyConfigured(true);
-    // Re-test to show updated status
     setTestStatus("testing");
     setTestMessage(null);
     try {
-      const data = await checkBrowserlessConnection();
-      if (data.status === "CONNECTED") {
-        setTestStatus("connected");
-        setTestMessage(`Connected! Chrome version: ${data.version}`);
+      const statusRes = await syncBrowserlessKeyWithBackend();
+      setKeyConfigured(statusRes.configured);
+      if (statusRes.configured) {
+        const data = await checkBrowserlessConnection();
+        if (data.status === "CONNECTED") {
+          setTestStatus("connected");
+          setTestMessage(`Connected! Chrome version: ${data.version}`);
+        } else if (data.status === "INVALID_KEY") {
+          setTestStatus("invalid_key");
+          setTestMessage(data.message || "API key is invalid or expired.");
+        } else {
+          setTestStatus("failed");
+          setTestMessage(data.message || "Connection failed after save.");
+        }
       } else {
-        setTestStatus("failed");
-        setTestMessage(data.message || "Connection failed after save.");
+        setTestStatus("idle");
       }
     } catch {
       setTestStatus("idle");
@@ -110,25 +161,36 @@ export function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 w-full border-b border-slate-200 dark:border-slate-800/80 bg-white/90 dark:bg-slate-950/80 backdrop-blur-xl transition-colors">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-md shadow-blue-500/20">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                Website Audit AI <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">v1.0 Monorepo</span>
-              </h1>
-              <p className="text-xs text-slate-400">Font Classification, CTA Design, Alt Tag &amp; SEO Compliance Scanner</p>
-            </div>
+          {/* Brand Logo & Navigation */}
+          <div className="flex items-center gap-6">
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+                <Sparkles className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex flex-col items-start justify-start">
+                <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+                  Website Audit
+                </h1>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                    by Razib Hossain
+                </span>
+              </div>
+            </Link>
+
+            
+            
           </div>
 
+          {/* Right Toolbar Controls */}
           <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
-              <Server className="h-3.5 w-3.5 text-slate-400" />
+            
+
+            {/* <div className="hidden xl:flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800">
+              <Server className="h-3.5 w-3.5 text-slate-500" />
               <span>Backend API: {API_BASE.replace('/api', '').replace('http://', '').replace('https://', '')}</span>
-            </div>
+            </div> */}
 
             {status === "online" && (
               <div className="flex items-center gap-2">
@@ -137,8 +199,8 @@ export function Navbar() {
                   onClick={handleOpenKeyModal}
                   className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
                     keyConfigured
-                      ? "bg-indigo-950/50 border-indigo-700/40 text-indigo-300 hover:bg-indigo-900/50"
-                      : "bg-amber-950/50 border-amber-700/40 text-amber-300 hover:bg-amber-900/50 animate-pulse"
+                      ? "bg-indigo-50 dark:bg-indigo-950/50 border-indigo-200 dark:border-indigo-700/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
+                      : "bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-700/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 animate-pulse"
                   }`}
                   title={keyConfigured ? "Manage Browserless API Key" : "Set up Browserless API Key for full browser auditing"}
                 >
@@ -147,30 +209,37 @@ export function Navbar() {
                 </button>
 
                 {/* Test Browserless button */}
-                <button
+                {/* <button
                   onClick={handleTestBrowserless}
                   disabled={testStatus === "testing"}
-                  className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-50 transition-all cursor-pointer"
                   title={testMessage || "Test Browserless.io API connection"}
                 >
                   {testStatus === "testing" ? (
                     <Activity className="h-3 w-3 animate-spin text-slate-400" />
                   ) : (
-                    <Globe className="h-3 w-3 text-slate-400" />
+                    <Globe className="h-3 w-3 text-slate-500" />
                   )}
                   Test Browserless
-                </button>
+                </button> */}
 
                 {/* Status badge */}
+                {testStatus === "testing" && (
+                  <span className="text-[10px] font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 px-2.5 py-1 rounded-full border border-blue-300 dark:border-blue-500/20 flex items-center gap-1">
+                    <Activity className="h-3 w-3 animate-spin text-blue-500" />
+                    Checking Key...
+                  </span>
+                )}
                 {testStatus === "connected" && (
-                  <span className="text-[10px] font-medium text-emerald-400 bg-emerald-950/20 px-2.5 py-1 rounded border border-emerald-500/20" title={testMessage || ''}>
-                    ✓ Connected
+                  <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 px-2.5 py-1 rounded-full border border-emerald-300 dark:border-emerald-500/20 flex items-center gap-1" title={testMessage || ''}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    API Key Connected
                   </span>
                 )}
                 {testStatus === "invalid_key" && (
                   <button
                     onClick={handleOpenKeyModal}
-                    className="text-[10px] font-medium text-red-400 bg-red-950/20 px-2.5 py-1 rounded border border-red-500/20 hover:bg-red-950/40 transition-colors"
+                    className="text-[10px] font-medium text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/20 px-2.5 py-1 rounded-full border border-red-300 dark:border-red-500/20 hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors"
                     title={testMessage || ''}
                   >
                     ✗ Invalid Key
@@ -179,7 +248,7 @@ export function Navbar() {
                 {testStatus === "not_configured" && (
                   <button
                     onClick={handleOpenKeyModal}
-                    className="text-[10px] font-medium text-amber-400 bg-amber-950/20 px-2.5 py-1 rounded border border-amber-500/20 hover:bg-amber-950/40 transition-colors"
+                    className="text-[10px] font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-2.5 py-1 rounded-full border border-amber-300 dark:border-amber-500/20 hover:bg-amber-100 dark:hover:bg-amber-950/40 transition-colors"
                     title={testMessage || ''}
                   >
                     Not Configured
@@ -188,7 +257,7 @@ export function Navbar() {
                 {testStatus === "failed" && (
                   <button
                     onClick={handleOpenKeyModal}
-                    className="text-[10px] font-medium text-red-400 bg-red-950/20 px-2.5 py-1 rounded border border-red-500/20 hover:bg-red-950/40 transition-colors"
+                    className="text-[10px] font-medium text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/20 px-2.5 py-1 rounded-full border border-red-300 dark:border-red-500/20 hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors"
                     title={testMessage || ''}
                   >
                     Failed
@@ -200,24 +269,88 @@ export function Navbar() {
             {status === "checking" && (
               <Badge variant="secondary" className="gap-1.5 py-1">
                 <Activity className="h-3 w-3 animate-spin text-slate-400" />
-                Checking API...
+                Checking Backend...
               </Badge>
             )}
 
             {status === "online" && (
-              <Badge variant="success" className="gap-1.5 py-1">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                API Connected
-              </Badge>
+               <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 px-2.5 py-1 rounded-full border border-emerald-300 dark:border-emerald-500/20 flex items-center gap-1" title={testMessage || ''}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Backend Connected
+                  </span>
             )}
 
             {status === "offline" && (
               <Badge variant="destructive" className="gap-1.5 py-1">
                 <span className="h-2 w-2 rounded-full bg-red-400" />
-                API Offline
+                Backend Offline
               </Badge>
             )}
           </div>
+
+          {/* Main Nav Items */}
+            <nav className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-xl border border-slate-200 dark:border-slate-800/80 text-xs font-medium">
+              
+              <Link
+                href="/"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+                  pathname === "/"
+                    ? "bg-blue-600 text-white shadow-sm font-semibold"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
+                }`}
+              >
+                <Home className="h-3.5 w-3.5" />
+                Home
+              </Link>
+              <Link
+                href="/dashboard"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+                  pathname === "/dashboard"
+                    ? "bg-blue-600 text-white shadow-sm font-semibold"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
+                }`}
+              >
+                <LayoutDashboard className="h-3.5 w-3.5" />
+                Audit Center
+              </Link>
+              <Link
+                href="/case-study"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+                  pathname === "/case-study"
+                    ? "bg-blue-600 text-white shadow-sm font-semibold"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
+                }`}
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                Case Study
+              </Link>
+              <Link
+                href="/guides"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+                  pathname === "/guides"
+                    ? "bg-blue-600 text-white shadow-sm font-semibold"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
+                }`}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Guides
+              </Link>
+              {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+              aria-label="Toggle Theme"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4 text-amber-400" />
+              ) : (
+                <Moon className="h-4 w-4 text-slate-700" />
+              )}
+            </button>
+            </nav>
+
+          
         </div>
       </header>
 

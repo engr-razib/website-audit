@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { motion } from "framer-motion";
 import { Zap, Search, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -43,7 +44,7 @@ export function QuickScanForm({ onScanComplete }: QuickScanFormProps) {
   };
 
   return (
-    <Card className="border-blue-900/30 bg-slate-900/80">
+    <Card className="border-blue-900/30 bg-slate-900/80 shadow-xl backdrop-blur-xl">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2 text-white">
           <Zap className="h-5 w-5 text-amber-400 fill-amber-400/20" />
@@ -106,31 +107,38 @@ export function QuickScanForm({ onScanComplete }: QuickScanFormProps) {
           </div>
 
           {error && (
-            <div className="p-3 text-xs rounded-lg bg-red-950/50 border border-red-800/50 text-red-300">
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="p-3 text-xs rounded-lg bg-red-950/50 border border-red-800/50 text-red-300"
+            >
               {error}
-            </div>
+            </motion.div>
           )}
 
-          <Button
-            type="submit"
-            disabled={loading}
-            variant="glow"
-            className="w-full md:w-auto"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Crawling & Analyzing Page...
-              </>
-            ) : (
-              <>
-                <Zap className="mr-2 h-4 w-4" />
-                Run Quick Scan
-              </>
-            )}
-          </Button>
+          <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+            <Button
+              type="submit"
+              disabled={loading}
+              variant="glow"
+              className="w-full md:w-auto cursor-pointer"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Crawling & Analyzing Page...
+                </>
+              ) : (
+                <>
+                  <Zap className="mr-2 h-4 w-4" />
+                  Run Quick Scan
+                </>
+              )}
+            </Button>
+          </motion.div>
         </form>
       </CardContent>
     </Card>
   );
 }
+
