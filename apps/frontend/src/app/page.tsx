@@ -133,39 +133,101 @@ export default function LandingPage() {
         </div>
       </motion.section>
 
-      {/* ⚡ Built for speed. Designed for everyone section */}
+      {/* ⚡ Experience the freedom to audit section */}
       <motion.section
         variants={itemVariants}
-        className="rounded-3xl bg-gradient-to-r from-blue-900/20 via-indigo-900/20 to-purple-900/20 dark:from-slate-900/80 dark:to-slate-900/90 border border-blue-500/20 p-8 sm:p-10 shadow-lg text-center space-y-6 backdrop-blur-xl"
+        className="rounded-3xl bg-gradient-to-r from-blue-900/15 via-indigo-900/15 to-purple-900/15 dark:from-slate-900/80 dark:to-slate-900/90 border border-blue-500/20 p-8 sm:p-10 shadow-lg text-center space-y-8 backdrop-blur-xl"
       >
         <div className="space-y-2 max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold uppercase tracking-wider">
-            <CheckCircle2 className="h-3.5 w-3.5" /> High-Performance Audit
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 text-xs font-bold uppercase tracking-wider">
+            <Sparkles className="h-3.5 w-3.5" /> High-Performance Audit
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
-            Built for speed. Designed for everyone.
+            Experience the freedom to audit.
           </h2>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 max-w-4xl mx-auto pt-2">
-          {[
-            "Free Forever",
-            "No Signup",
-            "Private in Browser",
-            "Unlimited Use",
-            "No Watermarks",
-            "Mobile Friendly",
-            "Instant Excel Downloads",
-          ].map((item, idx) => (
-            <motion.div
-              key={idx}
-              whileHover={{ scale: 1.05 }}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/90 dark:bg-slate-950/90 border border-slate-200 dark:border-slate-800 shadow-sm text-slate-900 dark:text-slate-100 font-semibold text-sm"
-            >
-              <span className="text-emerald-500 dark:text-emerald-400 font-bold">✓</span>
-              <span>{item}</span>
-            </motion.div>
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto text-left">
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className="p-5 rounded-2xl bg-white/90 dark:bg-slate-950/90 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2"
+          >
+            <div className="text-2xl">🎁</div>
+            <h4 className="font-bold text-slate-900 dark:text-white text-base">Try it Free</h4>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Test the waters with our free tier—no credit card required.
+            </p>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className="p-5 rounded-2xl bg-white/90 dark:bg-slate-950/90 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2"
+          >
+            <div className="text-2xl">🙌</div>
+            <h4 className="font-bold text-slate-900 dark:text-white text-base">Zero Friction Entry</h4>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Start your first scan instantly. Create an account only when you want to save your history and unlock premium tools.
+            </p>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className="p-5 rounded-2xl bg-white/90 dark:bg-slate-950/90 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2"
+          >
+            <div className="text-2xl">🔒</div>
+            <h4 className="font-bold text-slate-900 dark:text-white text-base">Secure &amp; Private</h4>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Your company data is handled with enterprise-grade security and privacy.
+            </p>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className="p-5 rounded-2xl bg-white/90 dark:bg-slate-950/90 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2"
+          >
+            <div className="text-2xl">📈</div>
+            <h4 className="font-bold text-slate-900 dark:text-white text-base">Scalable Usage</h4>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              From single-page checks to comprehensive site-wide audits.
+            </p>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className="p-5 rounded-2xl bg-white/90 dark:bg-slate-950/90 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2"
+          >
+            <div className="text-2xl">✨</div>
+            <h4 className="font-bold text-slate-900 dark:text-white text-base">Professional Results</h4>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Clean, presentation-ready downloads with absolutely no watermarks.
+            </p>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className="p-5 rounded-2xl bg-white/90 dark:bg-slate-950/90 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2"
+          >
+            <div className="text-2xl">📱</div>
+            <h4 className="font-bold text-slate-900 dark:text-white text-base">Any Device, Anywhere</h4>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Perfect, responsive results on desktop, tablet, or mobile.
+            </p>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className="p-5 rounded-2xl bg-white/90 dark:bg-slate-950/90 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2 md:col-span-2 lg:col-span-3"
+          >
+            <div className="flex items-start gap-3">
+              <div className="text-2xl shrink-0">⬇️</div>
+              <div className="space-y-1">
+                <h4 className="font-bold text-slate-900 dark:text-white text-base">Instant Results &amp; Downloads</h4>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Don&apos;t wait around. Audit, process, and download in seconds.
+                </p>
+              </div>
+            </div>
+          </motion.div>
         </div>
       </motion.section>
 

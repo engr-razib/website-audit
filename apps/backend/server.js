@@ -397,7 +397,39 @@ app.get('/api/audit/jobs/:jobId/download/excel', (req, res) => {
         return res.status(404).json({ error: 'Excel report not available' });
     }
 
-    res.download(job.excelPath);
+    const filename = `website_audit_report_${jobId.slice(0, 8)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+    res.sendFile(path.resolve(job.excelPath));
+});
+
+/**
+ * 5b. POST /api/audit/export/excel - On-Demand Excel Report Generation
+ */
+app.post('/api/audit/export/excel', async (req, res) => {
+    const auditData = req.body;
+    if (!auditData) {
+        return res.status(400).json({ error: 'auditData is required' });
+    }
+
+    try {
+        const tempId = uuidv4().slice(0, 8);
+        const tempPath = path.join(OUTPUTS_DIR, `website_audit_report_${tempId}.xlsx`);
+        await generateExcelReport(auditData, tempPath);
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="website_audit_report_${tempId}.xlsx"`);
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+        res.sendFile(tempPath, () => {
+            fs.unlink(tempPath, () => {});
+        });
+    } catch (err) {
+        console.error("[!] On-demand Excel generation failed:", err);
+        res.status(500).json({ error: 'Failed to generate Excel report', details: err.message });
+    }
 });
 
 /**
@@ -411,7 +443,11 @@ app.get('/api/audit/jobs/:jobId/download/json', (req, res) => {
         return res.status(404).json({ error: 'JSON report not available' });
     }
 
-    res.download(job.jsonPath);
+    const jsonFilename = `website_audit_report_${jobId.slice(0, 8)}.json`;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${jsonFilename}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.sendFile(path.resolve(job.jsonPath));
 });
 
 /**

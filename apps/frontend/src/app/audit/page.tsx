@@ -182,8 +182,8 @@ export default function AuditPage() {
         <JobStatusTracker jobId={activeJobId} onJobComplete={handleJobCompleted} />
       )}
 
-      {/* Download Bar for Completed Jobs */}
-      {activeJobId && auditData && <DownloadBar jobId={activeJobId} />}
+      {/* Download Bar for Completed Audit Scans */}
+      {auditData && <DownloadBar jobId={activeJobId} auditData={auditData} />}
 
       {/* Executive Summary Metrics */}
       {jobSummary && (

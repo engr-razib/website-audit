@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     template: "%s | Website Audit by Razib",
   },
   description:
-    "Comprehensive 6-in-1 Website Audit by Razib: Font Licensing Classification, CTA Design Tokens, Alt Tag & SEO Compliance Scanner.",
+    "Comprehensive 6-in-1 Website Audit by Razib: Font Licensing Classification, CTA Design, Alt Tag & SEO Compliance Scanner.",
   keywords: [
     "Website Audit",
     "Website Audit by Razib",
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     "Font Finder",
     "SEO Compliance Scanner",
     "Alt Tag Checker",
-    "CTA Token Audit",
+    "CTA Audit",
     "Accessibility Audit",
     "Razib Hossain",
   ],
@@ -45,14 +45,14 @@ export const metadata: Metadata = {
     url: siteUrl,
     title: "Website Audit by Razib",
     description:
-      "Comprehensive 6-in-1 Website Audit by Razib: Font Licensing Classification, CTA Design Tokens, Alt Tag & SEO Compliance Scanner.",
+      "Comprehensive 6-in-1 Website Audit by Razib: Font Licensing Classification, CTA Design, Alt Tag & SEO Compliance Scanner.",
     siteName: "Website Audit by Razib",
   },
   twitter: {
     card: "summary_large_image",
     title: "Website Audit by Razib",
     description:
-      "Comprehensive 6-in-1 Website Audit by Razib: Font Licensing Classification, CTA Design Tokens, Alt Tag & SEO Compliance Scanner.",
+      "Comprehensive 6-in-1 Website Audit by Razib: Font Licensing Classification, CTA Design, Alt Tag & SEO Compliance Scanner.",
     creator: "@razibhossain",
   },
   robots: {
@@ -77,7 +77,7 @@ const jsonLd = {
   name: "Website Audit by Razib",
   url: siteUrl,
   description:
-    "Comprehensive 6-in-1 Website Audit by Razib: Font Licensing Classification, CTA Design Tokens, Alt Tag & SEO Compliance Scanner.",
+    "Comprehensive 6-in-1 Website Audit by Razib: Font Licensing Classification, CTA Design, Alt Tag & SEO Compliance Scanner.",
   applicationCategory: "DeveloperApplication",
   operatingSystem: "All",
   author: {

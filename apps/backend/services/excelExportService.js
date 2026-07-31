@@ -48,11 +48,25 @@ async function generateExcelReport(fullAuditData, filePath) {
     titleRow.font = { name: 'Segoe UI', size: 16, bold: true, color: { argb: 'FF1F497D' } };
     summarySheet.addRow([]);
 
-    const totalPages = fullAuditData.pages ? fullAuditData.pages.length : 0;
-    const uniqueFonts = fullAuditData.fontSummary ? fullAuditData.fontSummary.length : 0;
-    const premiumFontsCount = fullAuditData.fontSummary ? fullAuditData.fontSummary.filter(f => f.isPremium).length : 0;
-    const missingAltImagesCount = fullAuditData.allMissingAltImages ? fullAuditData.allMissingAltImages.length : 0;
-    const totalCTAs = fullAuditData.allCTAs ? fullAuditData.allCTAs.length : 0;
+    // Normalize input data for both Quick Scan and Full Audit structures
+    const pages = fullAuditData.pages || (fullAuditData.url ? [fullAuditData] : []);
+    const fontSummary = fullAuditData.fontSummary || (fullAuditData.fonts ? fullAuditData.fonts.map(f => ({
+        primaryFont: f.cleanFontFamily || f.rawFontFamily || f.primaryFont || 'Unknown',
+        rawFontFamily: f.rawFontFamily || f.cleanFontFamily || '',
+        category: f.category || f.licenseType || 'Free / Standard',
+        isPremium: f.licenseType ? (f.licenseType.includes('Premium') || f.licenseType.includes('Commercial')) : !!f.isPremium,
+        pageCount: f.pageCount || 1
+    })) : []);
+    const allCTAs = fullAuditData.allCTAs || (fullAuditData.ctas ? fullAuditData.ctas.map(c => ({ url: c.url || fullAuditData.url, ...c })) : []);
+    const allMissingAltImages = fullAuditData.allMissingAltImages || (fullAuditData.images ? fullAuditData.images.filter(i => !i.hasAlt).map(i => ({ url: i.url || fullAuditData.url, ...i })) : []);
+    const allHeadings = fullAuditData.allHeadings || (fullAuditData.headings ? fullAuditData.headings.map(h => ({ url: h.url || fullAuditData.url, ...h })) : []);
+    const allTargetMatches = fullAuditData.allTargetMatches || (fullAuditData.targetFontElements ? fullAuditData.targetFontElements.map(m => ({ url: m.url || fullAuditData.url, ...m })) : []);
+
+    const totalPages = pages.length;
+    const uniqueFonts = fontSummary.length;
+    const premiumFontsCount = fontSummary.filter(f => f.isPremium).length;
+    const missingAltImagesCount = allMissingAltImages.length;
+    const totalCTAs = allCTAs.length;
 
     const metrics = [
         ['Total Pages Audited', totalPages],
@@ -86,14 +100,14 @@ async function generateExcelReport(fullAuditData, filePath) {
         fontSheet.getColumn(colNum).width = fontColWidths[colNum - 1];
     });
 
-    (fullAuditData.fontSummary || []).forEach((f, idx) => {
+    (fontSummary || []).forEach((f, idx) => {
         const row = fontSheet.addRow([
             idx + 1,
-            f.primaryFont,
-            f.rawFontFamily,
-            f.category,
+            f.primaryFont || f.cleanFontFamily || f.rawFontFamily,
+            f.rawFontFamily || f.cleanFontFamily,
+            f.category || f.licenseType,
             f.isPremium ? 'YES (Premium)' : 'NO (Free)',
-            f.pageCount
+            f.pageCount || 1
         ]);
         applyRowStyles(row, idx % 2 === 1, ['center', 'left', 'left', 'center', 'center', 'center']);
     });
@@ -112,11 +126,11 @@ async function generateExcelReport(fullAuditData, filePath) {
         ctaSheet.getColumn(colNum).width = ctaColWidths[colNum - 1];
     });
 
-    (fullAuditData.allCTAs || []).forEach((c, idx) => {
+    (allCTAs || []).forEach((c, idx) => {
         const row = ctaSheet.addRow([
             idx + 1,
             c.url,
-            c.tagName,
+            c.tagName || c.tag,
             c.text,
             c.fontFamily,
             c.fontSize,
@@ -146,13 +160,13 @@ async function generateExcelReport(fullAuditData, filePath) {
         imgSheet.getColumn(colNum).width = imgColWidths[colNum - 1];
     });
 
-    (fullAuditData.allMissingAltImages || []).forEach((img, idx) => {
+    (allMissingAltImages || []).forEach((img, idx) => {
         const row = imgSheet.addRow([
             idx + 1,
             img.url,
             img.src,
             'MISSING ALT TAG',
-            `${img.width} x ${img.height} px`,
+            `${img.width || img.naturalWidth || 0} x ${img.height || img.naturalHeight || 0} px`,
             img.parentTag,
             img.selector,
             img.outerHTML || '',
@@ -175,11 +189,11 @@ async function generateExcelReport(fullAuditData, filePath) {
         headSheet.getColumn(colNum).width = headColWidths[colNum - 1];
     });
 
-    (fullAuditData.allHeadings || []).forEach((h, idx) => {
+    (allHeadings || []).forEach((h, idx) => {
         const row = headSheet.addRow([
             idx + 1,
             h.url,
-            h.level,
+            h.level || h.tag,
             h.text,
             h.fontFamily,
             h.fontSize,
@@ -207,7 +221,7 @@ async function generateExcelReport(fullAuditData, filePath) {
         seoSheet.getColumn(colNum).width = seoColWidths[colNum - 1];
     });
 
-    (fullAuditData.pages || []).forEach((p, idx) => {
+    (pages || []).forEach((p, idx) => {
         const s = p.seo || {};
         const row = seoSheet.addRow([
             idx + 1,
@@ -238,20 +252,18 @@ async function generateExcelReport(fullAuditData, filePath) {
     });
 
     let matchIdx = 0;
-    (fullAuditData.pages || []).forEach(p => {
-        (p.targetFontElements || []).forEach(m => {
-            const row = matchesSheet.addRow([
-                ++matchIdx,
-                p.url,
-                m.matchType || '',
-                m.tagName,
-                m.selector,
-                m.textSnippet,
-                m.outerHTML || '',
-                m.cssStyles || ''
-            ]);
-            applyRowStyles(row, matchIdx % 2 === 1, ['center', 'left', 'center', 'center', 'left', 'left', 'left', 'left'], 45);
-        });
+    (allTargetMatches || []).forEach(m => {
+        const row = matchesSheet.addRow([
+            ++matchIdx,
+            m.url,
+            m.matchType || '',
+            m.tagName || m.tag,
+            m.selector,
+            m.textSnippet || m.text,
+            m.outerHTML || '',
+            m.cssStyles || ''
+        ]);
+        applyRowStyles(row, matchIdx % 2 === 1, ['center', 'left', 'center', 'center', 'left', 'left', 'left', 'left'], 45);
     });
 
     // Write file

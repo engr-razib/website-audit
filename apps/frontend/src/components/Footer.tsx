@@ -112,29 +112,29 @@ export function Footer() {
         {/* Value Highlights Banner */}
         <div className="pt-6 border-t border-slate-200 dark:border-slate-800/80 space-y-3">
           <h5 className="text-center font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-slate-200">
-            Built for speed. Designed for everyone.
+            Experience the freedom to audit.
           </h5>
-          <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] font-medium text-slate-700 dark:text-slate-300">
-            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
-              <span className="text-emerald-500 font-bold">✓</span> Free Forever
+          <div className="flex flex-wrap items-center justify-center gap-2.5 text-[11px] font-medium text-slate-700 dark:text-slate-300">
+            <span className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm text-slate-900 dark:text-slate-200">
+              <span>🎁</span> Try it Free
             </span>
-            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
-              <span className="text-emerald-500 font-bold">✓</span> No Signup
+            <span className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm text-slate-900 dark:text-slate-200">
+              <span>🙌</span> Zero Friction Entry
             </span>
-            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
-              <span className="text-emerald-500 font-bold">✓</span> Private in Browser
+            <span className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm text-slate-900 dark:text-slate-200">
+              <span>🔒</span> Secure &amp; Private
             </span>
-            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
-              <span className="text-emerald-500 font-bold">✓</span> Unlimited Use
+            <span className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm text-slate-900 dark:text-slate-200">
+              <span>📈</span> Scalable Usage
             </span>
-            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
-              <span className="text-emerald-500 font-bold">✓</span> No Watermarks
+            <span className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm text-slate-900 dark:text-slate-200">
+              <span>✨</span> Professional Results
             </span>
-            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
-              <span className="text-emerald-500 font-bold">✓</span> Mobile Friendly
+            <span className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm text-slate-900 dark:text-slate-200">
+              <span>📱</span> Any Device, Anywhere
             </span>
-            <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-900 px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-800">
-              <span className="text-emerald-500 font-bold">✓</span> Instant Excel Downloads
+            <span className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm text-slate-900 dark:text-slate-200">
+              <span>⬇️</span> Instant Results &amp; Downloads
             </span>
           </div>
         </div>
