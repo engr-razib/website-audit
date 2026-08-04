@@ -388,7 +388,7 @@ This text contains both URLs and custom comments. The engine will auto-detect al
                       type="url"
                       value={webpageUrl}
                       onChange={(e) => setWebpageUrl(e.target.value)}
-                      placeholder="e.g. https://cdt.org/spring-fling-gallery-2026/"
+                      placeholder="e.g. https://www.example.com/"
                       className="flex-1 rounded-xl border border-slate-300 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-slate-800 dark:text-slate-100"
                     />
                     <button

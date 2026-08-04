@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Heart, ExternalLink, Sparkles, BookOpen, FileText, Home, LayoutDashboard } from "lucide-react";
+import { Heart, ExternalLink, Sparkles, BookOpen, FileText, Home, LayoutDashboard, Mail } from "lucide-react";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -51,6 +51,12 @@ export function Footer() {
                 <Link href="/guides" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5 font-medium text-indigo-600 dark:text-indigo-400">
                   <FileText className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                   Audit &amp; Compliance Guides
+                </Link>
+              </li>
+              <li>
+                <Link href="/contact" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">
+                  <Mail className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  Contact Us
                 </Link>
               </li>
             </ul>

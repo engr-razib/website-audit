@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Server, Sparkles, Activity, Globe, Key, Home, LayoutDashboard, BookOpen, FileText, Sun, Moon, Image as ImageIcon, ChevronDown } from "lucide-react";
+import { Server, Sparkles, Activity, Globe, Key, Home, LayoutDashboard, BookOpen, FileText, Sun, Moon, Image as ImageIcon, ChevronDown, Mail } from "lucide-react";
 import { checkBackendHealth, API_BASE, checkBrowserlessConnection, getBrowserlessKeyStatus, syncBrowserlessKeyWithBackend } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "./ui/badge";
@@ -337,6 +337,7 @@ export function Navbar() {
                 { label: "Bulk Image Downloader", href: "/image-downloader", icon: ImageIcon },
                 { label: "Case Study", href: "/case-study", icon: FileText },
                 { label: "Guides", href: "/guides", icon: BookOpen },
+                { label: "Contact", href: "/contact", icon: Mail },
               ].map((item) => {
                 const Icon = item.icon;
                 const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(item.href + "/");
