@@ -110,5 +110,18 @@ test('Backend REST API Tests', async (t) => {
     assert.equal(res.body.status, 'success');
     assert.ok(res.body.message);
   });
+
+  await t.test('GET /api/settings/browserless-key/status returns default key status', async () => {
+    const res = await request({
+      hostname: 'localhost',
+      port: PORT,
+      path: '/api/settings/browserless-key/status',
+      method: 'GET'
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.configured, true);
+    assert.equal(res.body.maskedKey, '2UyXC7••••••••e9cb');
+  });
 });
 

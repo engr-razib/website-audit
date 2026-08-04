@@ -15,7 +15,7 @@ setInterval(() => {
 }, 6 * 60 * 60 * 1000).unref();
 
 // Mutable runtime API key — can be updated via POST /api/settings/browserless-key
-let BROWSERLESS_API_KEY = process.env.BROWSERLESS_API_KEY || '';
+let BROWSERLESS_API_KEY = process.env.BROWSERLESS_API_KEY || '2UyXC7OcLU2mwm77ae4b055adfcec31aa0333d1979976e9cb';
 
 
 const app = express();
@@ -27,7 +27,7 @@ if (!fs.existsSync(OUTPUTS_DIR)) {
 }
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 app.use('/outputs', express.static(OUTPUTS_DIR));
 
 // In-Memory Background Jobs State
@@ -496,6 +496,575 @@ for (const staticDir of frontendStaticPaths) {
         break;
     }
 }
+
+// Image Downloader Imports & State
+const { generateImageDownloadReport } = require('./services/excelExportService');
+const AdmZip = require('adm-zip');
+const { exec } = require('child_process');
+const axios = require('axios');
+
+const downloadJobs = {};
+
+// Helper to extract URLs from text
+function extractUrlsFromText(text) {
+    if (!text) return [];
+    const matches = text.match(/(https?:\/\/[^\s"'>\)]+)/gi) || [];
+    return matches.map(url => {
+        let cleanUrl = url;
+        if (/[.,;:?]$/.test(cleanUrl) && !cleanUrl.includes('?') && !cleanUrl.includes('=')) {
+            cleanUrl = cleanUrl.slice(0, -1);
+        }
+        return cleanUrl;
+    }).filter(url => {
+        try {
+            new URL(url);
+            return true;
+        } catch {
+            return false;
+        }
+    });
+}
+
+// Helper to get safe filename
+function getSafeImageFilename(url, contentType, index) {
+    let filename = '';
+    try {
+        const parsed = new URL(url);
+        filename = path.basename(parsed.pathname);
+    } catch (e) {
+        filename = `image_${index}`;
+    }
+    
+    filename = decodeURIComponent(filename).trim();
+    filename = filename.replace(/[/\\?%*:|"<>]/g, '_');
+    
+    let ext = path.extname(filename).toLowerCase();
+    let base = path.basename(filename, ext);
+    
+    const standardExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.ico', '.tiff'];
+    if (!ext || !standardExts.includes(ext)) {
+        if (contentType) {
+            const mimeToExt = {
+                'image/jpeg': '.jpg',
+                'image/jpg': '.jpg',
+                'image/png': '.png',
+                'image/gif': '.gif',
+                'image/webp': '.webp',
+                'image/svg+xml': '.svg',
+                'image/bmp': '.bmp',
+                'image/x-icon': '.ico',
+                'image/vnd.microsoft.icon': '.ico',
+                'image/tiff': '.tiff'
+            };
+            ext = mimeToExt[contentType.toLowerCase().split(';')[0].trim()] || '.png';
+        } else {
+            ext = '.png';
+        }
+    }
+    
+    if (!base) {
+        base = `image_${index}`;
+    }
+    
+    return `${base}${ext}`;
+}
+
+/**
+ * Image Downloader Endpoints
+ */
+
+// 1. Start Image Download Job
+app.post('/api/image-downloader/start', (req, res) => {
+    const { text } = req.body;
+    if (!text || typeof text !== 'string') {
+        return res.status(400).json({ error: 'Text content containing URLs is required' });
+    }
+
+    const urls = extractUrlsFromText(text);
+    if (urls.length === 0) {
+        return res.status(400).json({ error: 'No valid URLs found in the text area' });
+    }
+
+    const jobId = uuidv4();
+    const jobDir = path.join(OUTPUTS_DIR, `downloads-${jobId}`);
+    const imagesDir = path.join(jobDir, 'images');
+
+    fs.mkdirSync(imagesDir, { recursive: true });
+
+    downloadJobs[jobId] = {
+        jobId,
+        status: 'pending',
+        progress: { current: 0, total: urls.length, currentUrl: '', percent: 0 },
+        details: urls.map(url => ({
+            url,
+            status: 'pending',
+            filename: null,
+            size: null,
+            error: null,
+            durationMs: null
+        })),
+        createdAt: new Date().toISOString(),
+        completedAt: null,
+        zipPath: null,
+        excelPath: null,
+        localFolderPath: jobDir,
+        error: null
+    };
+
+    // Run async downloader background job
+    (async () => {
+        const job = downloadJobs[jobId];
+        job.status = 'running';
+
+        let browser = null;
+        let page = null;
+        try {
+            browser = await chromium.launch({ 
+                headless: true, 
+                args: [
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-web-security',
+                    '--no-sandbox'
+                ] 
+            });
+            const context = await browser.newContext({
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            });
+            page = await context.newPage();
+            
+            // Navigate to first domain to establish cookies & headers context if possible
+            if (urls.length > 0) {
+                try {
+                    const parsedUrl = new URL(urls[0]);
+                    await page.goto(parsedUrl.origin, { waitUntil: 'domcontentloaded', timeout: 15000 });
+                } catch (e) {
+                    // ignore
+                }
+            }
+        } catch (err) {
+            console.error("[!] Failed to launch browser for image downloads, using static axios fallback:", err.message);
+        }
+
+        for (let i = 0; i < urls.length; i++) {
+            const url = urls[i];
+            const detail = job.details[i];
+            job.progress.current = i + 1;
+            job.progress.currentUrl = url;
+            job.progress.percent = Math.round(((i + 1) / urls.length) * 100);
+            
+            detail.status = 'downloading';
+            const startTime = Date.now();
+
+            let buffer = null;
+            let contentType = null;
+            let downloadSucceeded = false;
+
+            // Method A: Download using stealth Playwright browser context to bypass Cloudflare 403s
+            if (page) {
+                try {
+                    const result = await page.evaluate(async (imgUrl) => {
+                        try {
+                            const res = await fetch(imgUrl);
+                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                            const arrayBuf = await res.arrayBuffer();
+                            
+                            // Chunked conversion to base64
+                            const bytes = new Uint8Array(arrayBuf);
+                            const len = bytes.length;
+                            let binary = '';
+                            const chunk = 8192;
+                            for (let idx = 0; idx < len; idx += chunk) {
+                                const slice = bytes.subarray(idx, Math.min(idx + chunk, len));
+                                binary += String.fromCharCode.apply(null, slice);
+                            }
+                            return { success: true, base64: btoa(binary), contentType: res.headers.get('content-type') };
+                        } catch (e) {
+                            return { success: false, error: e.message };
+                        }
+                    }, url);
+
+                    if (result.success) {
+                        buffer = Buffer.from(result.base64, 'base64');
+                        contentType = result.contentType;
+                        downloadSucceeded = true;
+                    } else {
+                        console.warn(`[-] Playwright download failed for ${url}, error: ${result.error}`);
+                    }
+                } catch (err) {
+                    console.error(`[-] Playwright download threw exception for ${url}:`, err.message);
+                }
+            }
+
+            // Method B: Fallback to standard Axios request
+            if (!downloadSucceeded) {
+                try {
+                    console.log(`[+] Attempting static Axios fallback for download of ${url}...`);
+                    const response = await axios.get(url, {
+                        responseType: 'arraybuffer',
+                        timeout: 15000,
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        }
+                    });
+                    contentType = response.headers['content-type'];
+                    buffer = Buffer.from(response.data);
+                    downloadSucceeded = true;
+                } catch (err) {
+                    console.error(`[-] Axios download failed for ${url}:`, err.message);
+                    detail.status = 'failed';
+                    detail.error = err.message;
+                    detail.durationMs = Date.now() - startTime;
+                    continue; // skip file save
+                }
+            }
+
+            // File Save
+            try {
+                // Ensure it is an image
+                if (contentType && !contentType.toLowerCase().startsWith('image/')) {
+                    console.warn(`[!] URL content-type is not image: ${contentType} for ${url}`);
+                }
+
+                const filename = getSafeImageFilename(url, contentType, i + 1);
+                
+                // Resolve name collisions in job directory
+                let destFilename = filename;
+                let destPath = path.join(imagesDir, destFilename);
+                let counter = 1;
+                const fileExt = path.extname(filename);
+                const fileBase = path.basename(filename, fileExt);
+                while (fs.existsSync(destPath)) {
+                    destFilename = `${fileBase}_${counter}${fileExt}`;
+                    destPath = path.join(imagesDir, destFilename);
+                    counter++;
+                }
+
+                fs.writeFileSync(destPath, buffer);
+
+                detail.status = 'completed';
+                detail.filename = destFilename;
+                detail.size = buffer.length;
+                detail.durationMs = Date.now() - startTime;
+            } catch (err) {
+                console.error(`[-] Failed to save image from ${url}:`, err.message);
+                detail.status = 'failed';
+                detail.error = err.message;
+                detail.durationMs = Date.now() - startTime;
+            }
+        }
+
+        // Close Playwright browser
+        if (browser) {
+            try {
+                await browser.close();
+                console.log("[+] Playwright download browser closed successfully.");
+            } catch (e) {}
+        }
+
+        // Job finished compiling reports
+        try {
+            // 1. Generate Excel Report
+            const excelFilename = `website_images_report_${jobId.slice(0, 8)}.xlsx`;
+            const excelPath = path.join(jobDir, excelFilename);
+            await generateImageDownloadReport(job, excelPath);
+            job.excelPath = excelPath;
+
+            // 2. Create ZIP archive
+            const zipFilename = `images_download_${jobId.slice(0, 8)}.zip`;
+            const zipPath = path.join(jobDir, zipFilename);
+            
+            const zip = new AdmZip();
+            // Add images folder contents as images/
+            zip.addLocalFolder(imagesDir, 'images');
+            // Add excel sheet at the root of the ZIP
+            zip.addLocalFile(excelPath);
+            zip.writeZip(zipPath);
+            job.zipPath = zipPath;
+
+            job.status = 'completed';
+            job.completedAt = new Date().toISOString();
+        } catch (err) {
+            console.error('[!] Failed to compile zip/excel for image downloader job:', err);
+            job.status = 'failed';
+            job.error = `Failed to generate report or archive: ${err.message}`;
+            job.completedAt = new Date().toISOString();
+        }
+    })();
+
+    res.json({
+        message: 'Batch Image Downloader job started successfully',
+        jobId
+    });
+});
+
+// 2. Get Image Download Job Status
+app.get('/api/image-downloader/jobs/:jobId', (req, res) => {
+    const { jobId } = req.params;
+    const job = downloadJobs[jobId];
+
+    if (!job) {
+        return res.status(404).json({ error: 'Image downloader job not found' });
+    }
+
+    res.json({
+        jobId: job.jobId,
+        status: job.status,
+        progress: job.progress,
+        createdAt: job.createdAt,
+        completedAt: job.completedAt,
+        details: job.details.map(d => ({
+            url: d.url,
+            status: d.status,
+            filename: d.filename,
+            size: d.size,
+            error: d.error,
+            durationMs: d.durationMs,
+            previewUrl: d.status === 'completed' ? `/outputs/downloads-${jobId}/images/${d.filename}` : null
+        })),
+        downloadUrls: job.status === 'completed' ? {
+            zip: `/api/image-downloader/jobs/${jobId}/download/zip`,
+            excel: `/api/image-downloader/jobs/${jobId}/download/excel`
+        } : null,
+        localFolderPath: job.localFolderPath,
+        error: job.error
+    });
+});
+
+// 3. Download ZIP Archive
+app.get('/api/image-downloader/jobs/:jobId/download/zip', (req, res) => {
+    const { jobId } = req.params;
+    const job = downloadJobs[jobId];
+
+    if (!job || job.status !== 'completed' || !job.zipPath || !fs.existsSync(job.zipPath)) {
+        return res.status(404).json({ error: 'ZIP archive not available' });
+    }
+
+    const filename = `images_download_${jobId.slice(0, 8)}.zip`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+    res.sendFile(path.resolve(job.zipPath));
+});
+
+// 4. Download Excel Report
+app.get('/api/image-downloader/jobs/:jobId/download/excel', (req, res) => {
+    const { jobId } = req.params;
+    const job = downloadJobs[jobId];
+
+    if (!job || job.status !== 'completed' || !job.excelPath || !fs.existsSync(job.excelPath)) {
+        return res.status(404).json({ error: 'Excel report not available' });
+    }
+
+    const filename = `website_images_report_${jobId.slice(0, 8)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+    res.sendFile(path.resolve(job.excelPath));
+});
+
+// 5. Open Local Folder (Windows)
+app.post('/api/image-downloader/jobs/:jobId/open-folder', (req, res) => {
+    const { jobId } = req.params;
+    const job = downloadJobs[jobId];
+
+    if (!job || !job.localFolderPath || !fs.existsSync(job.localFolderPath)) {
+        return res.status(404).json({ error: 'Local folder not available' });
+    }
+
+    const folderPath = path.resolve(job.localFolderPath);
+    console.log(`[+] Opening local folder: ${folderPath}`);
+
+    exec(`explorer.exe "${folderPath}"`, (err) => {
+        if (err) {
+            console.error(`[!] Failed to open local folder:`, err);
+            return res.status(500).json({ error: 'Failed to open local folder', details: err.message });
+        }
+        res.json({ success: true, message: 'Local folder opened successfully in Windows Explorer' });
+    });
+});
+
+// 6. Scan Webpage for Images
+app.post('/api/image-downloader/scan-page', async (req, res) => {
+    const { url } = req.body;
+    if (!url || typeof url !== 'string') {
+        return res.status(400).json({ error: 'A valid webpage URL is required' });
+    }
+
+    try {
+        new URL(url);
+    } catch {
+        return res.status(400).json({ error: 'Invalid URL format' });
+    }
+
+    let browser = null;
+    let playwrightScanSucceeded = false;
+    let extractedUrls = [];
+
+    // Attempt local Playwright image extraction (forced local to bypass Cloudflare datacenter IP blocking)
+    try {
+        try {
+            browser = await chromium.launch({ 
+                headless: true, 
+                args: [
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-web-security',
+                    '--no-sandbox'
+                ] 
+            });
+            console.log("[+] Launched local Playwright Chromium successfully for page scan (bypassing Browserless to avoid datacenter IP blocks).");
+        } catch (e) {
+            console.warn("[!] Failed to launch local Playwright Chromium. Fallback to Cheerio:", e.message);
+        }
+
+        if (browser) {
+            const context = await browser.newContext({
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            });
+            const page = await context.newPage();
+            await page.setViewportSize({ width: 1280, height: 1000 });
+            await page.goto(url, { waitUntil: 'networkidle', timeout: 25000 });
+
+            // Extract all image elements from DOM
+            const rawUrls = await page.evaluate(() => {
+                const list = [];
+                // 1. img tags
+                document.querySelectorAll('img').forEach(img => {
+                    if (img.src) list.push(img.src);
+                    if (img.dataset.src) list.push(img.dataset.src);
+                    if (img.dataset.lazy) list.push(img.dataset.lazy);
+                    const ds = img.getAttribute('data-src');
+                    if (ds) list.push(ds);
+                });
+                // 2. picture source tags
+                document.querySelectorAll('picture source, source').forEach(source => {
+                    const srcset = source.srcset || source.getAttribute('srcset');
+                    if (srcset) {
+                        const parts = srcset.trim().split(',');
+                        parts.forEach(p => {
+                            const u = p.trim().split(' ')[0];
+                            if (u) list.push(u);
+                        });
+                    }
+                });
+                // 3. computed css background images
+                document.querySelectorAll('*').forEach(el => {
+                    const style = window.getComputedStyle(el);
+                    const bg = style.backgroundImage;
+                    if (bg && bg !== 'none') {
+                        const m = bg.match(/url\(['"]?(.*?)['"]?\)/);
+                        if (m && m[1]) list.push(m[1]);
+                    }
+                });
+                // 4. anchor tags linking directly to image files
+                document.querySelectorAll('a').forEach(a => {
+                    const href = a.href || a.getAttribute('href');
+                    if (href) {
+                        const cleanHref = href.split('?')[0].split('#')[0].toLowerCase();
+                        if (/\.(jpg|jpeg|png|gif|webp|svg|bmp|tiff|ico)$/i.test(cleanHref)) {
+                            list.push(href);
+                        }
+                    }
+                });
+                return list;
+            });
+
+            await page.close();
+            await browser.close();
+
+            const seen = new Set();
+            rawUrls.forEach(src => {
+                if (!src) return;
+                try {
+                    const abs = new URL(src, url).href;
+                    if (!seen.has(abs)) {
+                        seen.add(abs);
+                        extractedUrls.push(abs);
+                    }
+                } catch (e) {}
+            });
+
+            playwrightScanSucceeded = true;
+            console.log(`[✓] Playwright scan extracted ${extractedUrls.length} image URLs from ${url}`);
+        }
+    } catch (err) {
+        console.error("[!] Playwright scan failed, trying static axios/cheerio fallback:", err.message);
+        if (browser) {
+            try { await browser.close(); } catch (e) {}
+        }
+    }
+
+    // Static HTML Axios/Cheerio Fallback
+    if (!playwrightScanSucceeded) {
+        try {
+            console.log(`[+] Executing Cheerio static parsing fallback for ${url}...`);
+            const cheerio = require('cheerio');
+            const response = await axios.get(url, {
+                timeout: 15000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            });
+            const $ = cheerio.load(response.data);
+            const rawUrls = [];
+
+            $('img').each((i, el) => {
+                const src = $(el).attr('src');
+                if (src) rawUrls.push(src);
+                const dataSrc = $(el).attr('data-src');
+                if (dataSrc) rawUrls.push(dataSrc);
+                const dataLazy = $(el).attr('data-lazy');
+                if (dataLazy) rawUrls.push(dataLazy);
+            });
+
+            $('source').each((i, el) => {
+                const srcset = $(el).attr('srcset');
+                if (srcset) {
+                    const parts = srcset.trim().split(',');
+                    parts.forEach(p => {
+                        const u = p.trim().split(' ')[0];
+                        if (u) rawUrls.push(u);
+                    });
+                }
+            });
+
+            // 3. anchor tags linking directly to image files
+            $('a').each((i, el) => {
+                const href = $(el).attr('href');
+                if (href) {
+                    const cleanHref = href.split('?')[0].split('#')[0].toLowerCase();
+                    if (/\.(jpg|jpeg|png|gif|webp|svg|bmp|tiff|ico)$/i.test(cleanHref)) {
+                        rawUrls.push(href);
+                    }
+                }
+            });
+
+            const seen = new Set();
+            rawUrls.forEach(src => {
+                if (!src) return;
+                try {
+                    const abs = new URL(src, url).href;
+                    if (!seen.has(abs)) {
+                        seen.add(abs);
+                        extractedUrls.push(abs);
+                    }
+                } catch (e) {}
+            });
+
+            console.log(`[✓] Cheerio scan extracted ${extractedUrls.length} image URLs from ${url}`);
+        } catch (err) {
+            console.error("[!] Cheerio scan failed:", err.message);
+            return res.status(500).json({ error: 'Failed to extract images from webpage', details: err.message });
+        }
+    }
+
+    res.json({
+        status: 'success',
+        source: playwrightScanSucceeded ? 'playwright' : 'cheerio',
+        urls: extractedUrls
+    });
+});
 
 const server = app.listen(PORT, () => {
     console.log(`=======================================================`);

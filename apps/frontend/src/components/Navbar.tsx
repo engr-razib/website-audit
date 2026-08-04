@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Server, Sparkles, Activity, Globe, Key, Home, LayoutDashboard, BookOpen, FileText, Sun, Moon } from "lucide-react";
+import { Server, Sparkles, Activity, Globe, Key, Home, LayoutDashboard, BookOpen, FileText, Sun, Moon, Image as ImageIcon } from "lucide-react";
 import { checkBackendHealth, API_BASE, checkBrowserlessConnection, getBrowserlessKeyStatus, syncBrowserlessKeyWithBackend } from "@/lib/api";
 import { motion } from "framer-motion";
 import { Badge } from "./ui/badge";
@@ -323,6 +323,7 @@ export function Navbar() {
             {[
               { label: "Home", href: "/", icon: Home },
               { label: "Audit Center", href: "/audit", icon: LayoutDashboard },
+              { label: "Image Downloader", href: "/image-downloader", icon: ImageIcon },
               { label: "Case Study", href: "/case-study", icon: BookOpen },
               { label: "Guides", href: "/guides", icon: FileText },
             ].map((item) => {

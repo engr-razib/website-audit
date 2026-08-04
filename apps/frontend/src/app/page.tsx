@@ -88,7 +88,7 @@ export default function LandingPage() {
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-base shadow-xl shadow-blue-500/25 transition-all transform group cursor-pointer"
             >
               <Zap className="h-5 w-5 fill-white text-white" />
-              Start Now
+              Start Free Audit
               <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Link>
           </motion.div>
@@ -444,7 +444,7 @@ export default function LandingPage() {
             className="inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-lg shadow-xl shadow-blue-500/30 transition-all transform hover:-translate-y-1 cursor-pointer"
           >
             <Zap className="h-5 w-5 fill-white text-white" />
-            Start Now - Audit Control Center
+            Start Free Audit
             <ArrowRight className="h-5 w-5" />
           </Link>
         </div>

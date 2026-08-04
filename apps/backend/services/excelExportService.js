@@ -272,6 +272,128 @@ async function generateExcelReport(fullAuditData, filePath) {
     return filePath;
 }
 
+
+async function generateImageDownloadReport(downloadData, filePath) {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Website Audit Microservice API';
+
+    const headerStyle = {
+        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F497D' } },
+        font: { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FFFFFFFF' } },
+        alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+        border: {
+            top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+            left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+            bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+            right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
+        }
+    };
+
+    function applyRowStyles(row, isEven, aligns = [], rowHeight = 24) {
+        if (rowHeight) {
+            row.height = rowHeight;
+        }
+        const rowBgColor = isEven ? 'FFF2F5F9' : 'FFFFFFFF';
+        row.eachCell((cell, colNum) => {
+            cell.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF333333' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBgColor } };
+            cell.border = {
+                top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
+            };
+            const align = aligns[colNum - 1] || 'left';
+            cell.alignment = { horizontal: align, vertical: 'middle', wrapText: true };
+        });
+    }
+
+    // -------------------------------------------------------------
+    // Worksheet 1: Summary
+    // -------------------------------------------------------------
+    const summarySheet = workbook.addWorksheet('Summary');
+    summarySheet.views = [{ showGridLines: true }];
+    summarySheet.getColumn(1).width = 35;
+    summarySheet.getColumn(2).width = 45;
+
+    const titleRow = summarySheet.addRow(['Batch Image Downloader Report', '']);
+    titleRow.font = { name: 'Segoe UI', size: 16, bold: true, color: { argb: 'FF1F497D' } };
+    summarySheet.addRow([]);
+
+    const details = downloadData.details || [];
+    const totalUrls = details.length;
+    const successCount = details.filter(d => d.status === 'completed').length;
+    const failedCount = details.filter(d => d.status === 'failed').length;
+    const totalSizeBytes = details.reduce((sum, d) => sum + (d.size || 0), 0);
+    const totalSizeText = totalSizeBytes > 1024 * 1024 
+        ? `${(totalSizeBytes / (1024 * 1024)).toFixed(2)} MB`
+        : `${(totalSizeBytes / 1024).toFixed(2)} KB`;
+
+    const formatTime = (isoString) => isoString ? new Date(isoString).toLocaleString() : 'N/A';
+    const durationMs = downloadData.completedAt && downloadData.createdAt
+        ? new Date(downloadData.completedAt) - new Date(downloadData.createdAt)
+        : 0;
+    const durationText = `${(durationMs / 1000).toFixed(2)} seconds`;
+
+    const metrics = [
+        ['Job ID', downloadData.jobId],
+        ['Created At', formatTime(downloadData.createdAt)],
+        ['Completed At', formatTime(downloadData.completedAt)],
+        ['Total Execution Time', durationText],
+        ['Total URLs Inputted', totalUrls],
+        ['Successfully Downloaded', successCount],
+        ['Failed Downloads', failedCount],
+        ['Total Download Size', totalSizeText]
+    ];
+
+    metrics.forEach(([label, val]) => {
+        const row = summarySheet.addRow([label, val]);
+        row.height = 24;
+        row.getCell(1).font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF1F497D' } };
+        row.getCell(2).font = { name: 'Segoe UI', size: 11, bold: false };
+    });
+
+    // -------------------------------------------------------------
+    // Worksheet 2: Download Details
+    // -------------------------------------------------------------
+    const detailSheet = workbook.addWorksheet('Download Details');
+    detailSheet.views = [{ state: 'frozen', ySplit: 1, showGridLines: true }];
+    
+    const headers = ['SL', 'Original URL', 'Saved Filename', 'Status', 'File Size', 'Duration (ms)', 'Error Message'];
+    const colWidths = [8, 60, 30, 15, 15, 18, 45];
+    const headerRow = detailSheet.addRow(headers);
+    headerRow.height = 28;
+    headerRow.eachCell((cell, colNum) => {
+        Object.assign(cell, headerStyle);
+        detailSheet.getColumn(colNum).width = colWidths[colNum - 1];
+    });
+
+    details.forEach((d, idx) => {
+        const sizeText = d.size
+            ? (d.size > 1024 * 1024 
+                ? `${(d.size / (1024 * 1024)).toFixed(2)} MB`
+                : `${(d.size / 1024).toFixed(2)} KB`)
+            : '0 KB';
+        const row = detailSheet.addRow([
+            idx + 1,
+            d.url,
+            d.filename || 'N/A',
+            d.status.toUpperCase(),
+            sizeText,
+            d.durationMs !== undefined ? `${d.durationMs} ms` : 'N/A',
+            d.error || ''
+        ]);
+        applyRowStyles(row, idx % 2 === 1, ['center', 'left', 'left', 'center', 'center', 'center', 'left'], 28);
+    });
+
+    // Write file
+    const buffer = await workbook.xlsx.writeBuffer();
+    fs.writeFileSync(filePath, buffer);
+    return filePath;
+}
+
 module.exports = {
-    generateExcelReport
+    generateExcelReport,
+    generateImageDownloadReport
 };
+

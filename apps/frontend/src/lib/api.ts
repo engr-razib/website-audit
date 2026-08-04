@@ -226,3 +226,106 @@ export async function syncBrowserlessKeyWithBackend(): Promise<BrowserlessKeySta
   return getBrowserlessKeyStatus();
 }
 
+export interface ImageDownloadProgress {
+  url: string;
+  filename: string | null;
+  status: 'pending' | 'downloading' | 'completed' | 'failed';
+  size: number | null;
+  error: string | null;
+  durationMs: number | null;
+  previewUrl?: string | null;
+}
+
+export interface ImageDownloadJobStatus {
+  jobId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress: {
+    current: number;
+    total: number;
+    currentUrl: string;
+    percent: number;
+  };
+  details: ImageDownloadProgress[];
+  createdAt: string;
+  completedAt: string | null;
+  downloadUrls?: {
+    zip: string;
+    excel: string;
+  } | null;
+  localFolderPath?: string | null;
+  error?: string | null;
+}
+
+export async function startImageDownloadJob(text: string): Promise<{ jobId: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/image-downloader/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Image download job start failed' }));
+      throw new Error(err.error || 'Failed to start image downloader');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message && err.message !== 'Failed to fetch') {
+      throw err;
+    }
+    throw new Error('Backend server is offline or unreachable.');
+  }
+}
+
+export async function getImageDownloadJobStatus(jobId: string): Promise<ImageDownloadJobStatus> {
+  try {
+    const res = await fetch(`${API_BASE}/image-downloader/jobs/${jobId}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('Failed to fetch job status');
+    return await res.json();
+  } catch (err: any) {
+    throw new Error(err.message === 'Failed to fetch' ? 'Backend server is offline' : err.message || 'Failed to fetch job status');
+  }
+}
+
+export async function openLocalFolder(jobId: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/image-downloader/jobs/${jobId}/open-folder`, { method: 'POST' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Failed to open local folder' }));
+      throw new Error(err.error || 'Failed to open local folder');
+    }
+    return await res.json();
+  } catch (err: any) {
+    throw new Error(err.message || 'Failed to communicate with backend to open local folder');
+  }
+}
+
+export function getZipDownloadUrl(jobId: string): string {
+  return `${API_BASE}/image-downloader/jobs/${jobId}/download/zip`;
+}
+
+export function getImageExcelDownloadUrl(jobId: string): string {
+  return `${API_BASE}/image-downloader/jobs/${jobId}/download/excel`;
+}
+
+export async function scanWebpageForImages(url: string): Promise<{ status: string; source: string; urls: string[] }> {
+  try {
+    const res = await fetch(`${API_BASE}/image-downloader/scan-page`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Webpage image extraction failed' }));
+      throw new Error(err.error || 'Failed to extract images from website');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message && err.message !== 'Failed to fetch') {
+      throw err;
+    }
+    throw new Error('Backend server is offline or webpage scanner is unreachable.');
+  }
+}
+
+
+
