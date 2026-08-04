@@ -307,12 +307,12 @@ export function getImageExcelDownloadUrl(jobId: string): string {
   return `${API_BASE}/image-downloader/jobs/${jobId}/download/excel`;
 }
 
-export async function scanWebpageForImages(url: string): Promise<{ status: string; source: string; urls: string[] }> {
+export async function scanWebpageForImages(url: string, selector?: string): Promise<{ status: string; source: string; urls: string[] }> {
   try {
     const res = await fetch(`${API_BASE}/image-downloader/scan-page`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, selector }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: 'Webpage image extraction failed' }));

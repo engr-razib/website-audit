@@ -887,7 +887,7 @@ app.post('/api/image-downloader/jobs/:jobId/open-folder', (req, res) => {
 
 // 6. Scan Webpage for Images
 app.post('/api/image-downloader/scan-page', async (req, res) => {
-    const { url } = req.body;
+    const { url, selector } = req.body;
     if (!url || typeof url !== 'string') {
         return res.status(400).json({ error: 'A valid webpage URL is required' });
     }
@@ -927,48 +927,69 @@ app.post('/api/image-downloader/scan-page', async (req, res) => {
             await page.goto(url, { waitUntil: 'networkidle', timeout: 25000 });
 
             // Extract all image elements from DOM
-            const rawUrls = await page.evaluate(() => {
+            const rawUrls = await page.evaluate((sel) => {
                 const list = [];
-                // 1. img tags
-                document.querySelectorAll('img').forEach(img => {
-                    if (img.src) list.push(img.src);
-                    if (img.dataset.src) list.push(img.dataset.src);
-                    if (img.dataset.lazy) list.push(img.dataset.lazy);
-                    const ds = img.getAttribute('data-src');
-                    if (ds) list.push(ds);
-                });
-                // 2. picture source tags
-                document.querySelectorAll('picture source, source').forEach(source => {
-                    const srcset = source.srcset || source.getAttribute('srcset');
-                    if (srcset) {
-                        const parts = srcset.trim().split(',');
-                        parts.forEach(p => {
-                            const u = p.trim().split(' ')[0];
-                            if (u) list.push(u);
+                const root = sel ? document.querySelector(sel) : document;
+                if (!root) return list;
+
+                // Helper to parse srcset and select the highest resolution URL
+                const getBestSrcFromSrcset = (srcset, defaultSrc) => {
+                    if (!srcset) return defaultSrc;
+                    try {
+                        const candidates = srcset.split(',').map(item => {
+                            const parts = item.trim().split(/\s+/);
+                            const url = parts[0];
+                            const descriptor = parts[1] || '';
+                            
+                            let value = 0;
+                            let type = 'w';
+                            
+                            if (descriptor.endsWith('w')) {
+                                value = parseInt(descriptor.slice(0, -1), 10) || 0;
+                                type = 'w';
+                            } else if (descriptor.endsWith('x')) {
+                                value = parseFloat(descriptor.slice(0, -1)) || 0;
+                                type = 'x';
+                            } else {
+                                value = 1;
+                                type = 'x';
+                            }
+                            return { url, value, type };
                         });
-                    }
-                });
-                // 3. computed css background images
-                document.querySelectorAll('*').forEach(el => {
-                    const style = window.getComputedStyle(el);
-                    const bg = style.backgroundImage;
-                    if (bg && bg !== 'none') {
-                        const m = bg.match(/url\(['"]?(.*?)['"]?\)/);
-                        if (m && m[1]) list.push(m[1]);
-                    }
-                });
-                // 4. anchor tags linking directly to image files
-                document.querySelectorAll('a').forEach(a => {
-                    const href = a.href || a.getAttribute('href');
-                    if (href) {
-                        const cleanHref = href.split('?')[0].split('#')[0].toLowerCase();
-                        if (/\.(jpg|jpeg|png|gif|webp|svg|bmp|tiff|ico)$/i.test(cleanHref)) {
-                            list.push(href);
+                        
+                        if (candidates.length === 0) return defaultSrc;
+                        
+                        const wCandidates = candidates.filter(c => c.type === 'w');
+                        const xCandidates = candidates.filter(c => c.type === 'x');
+                        
+                        if (wCandidates.length > 0) {
+                            wCandidates.sort((a, b) => b.value - a.value);
+                            return wCandidates[0].url;
+                        } else if (xCandidates.length > 0) {
+                            xCandidates.sort((a, b) => b.value - a.value);
+                            return xCandidates[0].url;
                         }
+                    } catch (e) {}
+                    return defaultSrc;
+                };
+
+                // img tags only
+                root.querySelectorAll('img').forEach(img => {
+                    let bestSrc = img.src;
+                    const srcset = img.srcset || img.getAttribute('srcset') || img.getAttribute('data-srcset') || img.getAttribute('data-lazy-srcset');
+                    
+                    if (srcset) {
+                        bestSrc = getBestSrcFromSrcset(srcset, bestSrc);
                     }
+                    
+                    if (!bestSrc) {
+                        bestSrc = img.dataset.src || img.dataset.lazy || img.getAttribute('data-src') || img.getAttribute('data-lazy');
+                    }
+                    
+                    if (bestSrc) list.push(bestSrc);
                 });
                 return list;
-            });
+            }, selector);
 
             await page.close();
             await browser.close();
@@ -986,7 +1007,7 @@ app.post('/api/image-downloader/scan-page', async (req, res) => {
             });
 
             playwrightScanSucceeded = true;
-            console.log(`[✓] Playwright scan extracted ${extractedUrls.length} image URLs from ${url}`);
+            console.log(`[✓] Playwright scan extracted ${extractedUrls.length} image URLs from ${url} (Selector: ${selector || 'None'})`);
         }
     } catch (err) {
         console.error("[!] Playwright scan failed, trying static axios/cheerio fallback:", err.message);
@@ -1008,37 +1029,64 @@ app.post('/api/image-downloader/scan-page', async (req, res) => {
             });
             const $ = cheerio.load(response.data);
             const rawUrls = [];
+            const root = selector ? $(selector) : $('html');
 
-            $('img').each((i, el) => {
-                const src = $(el).attr('src');
-                if (src) rawUrls.push(src);
-                const dataSrc = $(el).attr('data-src');
-                if (dataSrc) rawUrls.push(dataSrc);
-                const dataLazy = $(el).attr('data-lazy');
-                if (dataLazy) rawUrls.push(dataLazy);
-            });
-
-            $('source').each((i, el) => {
-                const srcset = $(el).attr('srcset');
-                if (srcset) {
-                    const parts = srcset.trim().split(',');
-                    parts.forEach(p => {
-                        const u = p.trim().split(' ')[0];
-                        if (u) rawUrls.push(u);
+            const getBestSrcFromSrcset = (srcset, defaultSrc) => {
+                if (!srcset) return defaultSrc;
+                try {
+                    const candidates = srcset.split(',').map(item => {
+                        const parts = item.trim().split(/\s+/);
+                        const url = parts[0];
+                        const descriptor = parts[1] || '';
+                        
+                        let value = 0;
+                        let type = 'w';
+                        
+                        if (descriptor.endsWith('w')) {
+                            value = parseInt(descriptor.slice(0, -1), 10) || 0;
+                            type = 'w';
+                        } else if (descriptor.endsWith('x')) {
+                            value = parseFloat(descriptor.slice(0, -1)) || 0;
+                            type = 'x';
+                        } else {
+                            value = 1;
+                            type = 'x';
+                        }
+                        return { url, value, type };
                     });
-                }
-            });
-
-            // 3. anchor tags linking directly to image files
-            $('a').each((i, el) => {
-                const href = $(el).attr('href');
-                if (href) {
-                    const cleanHref = href.split('?')[0].split('#')[0].toLowerCase();
-                    if (/\.(jpg|jpeg|png|gif|webp|svg|bmp|tiff|ico)$/i.test(cleanHref)) {
-                        rawUrls.push(href);
+                    
+                    if (candidates.length === 0) return defaultSrc;
+                    
+                    const wCandidates = candidates.filter(c => c.type === 'w');
+                    const xCandidates = candidates.filter(c => c.type === 'x');
+                    
+                    if (wCandidates.length > 0) {
+                        wCandidates.sort((a, b) => b.value - a.value);
+                        return wCandidates[0].url;
+                    } else if (xCandidates.length > 0) {
+                        xCandidates.sort((a, b) => b.value - a.value);
+                        return xCandidates[0].url;
                     }
-                }
-            });
+                } catch (e) {}
+                return defaultSrc;
+            };
+
+            if (root.length > 0) {
+                root.find('img').each((i, el) => {
+                    let bestSrc = $(el).attr('src');
+                    const srcset = $(el).attr('srcset') || $(el).attr('data-srcset') || $(el).attr('data-lazy-srcset');
+                    
+                    if (srcset) {
+                        bestSrc = getBestSrcFromSrcset(srcset, bestSrc);
+                    }
+                    
+                    if (!bestSrc) {
+                        bestSrc = $(el).attr('data-src') || $(el).attr('data-lazy');
+                    }
+                    
+                    if (bestSrc) rawUrls.push(bestSrc);
+                });
+            }
 
             const seen = new Set();
             rawUrls.forEach(src => {
@@ -1052,7 +1100,7 @@ app.post('/api/image-downloader/scan-page', async (req, res) => {
                 } catch (e) {}
             });
 
-            console.log(`[✓] Cheerio scan extracted ${extractedUrls.length} image URLs from ${url}`);
+            console.log(`[✓] Cheerio scan extracted ${extractedUrls.length} image URLs from ${url} (Selector: ${selector || 'None'})`);
         } catch (err) {
             console.error("[!] Cheerio scan failed:", err.message);
             return res.status(500).json({ error: 'Failed to extract images from webpage', details: err.message });

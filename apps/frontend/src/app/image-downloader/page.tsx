@@ -58,6 +58,8 @@ export default function ImageDownloaderPage() {
   const [webpageUrl, setWebpageUrl] = useState("");
   const [scanning, setScanning] = useState(false);
   const [scanSuccess, setScanSuccess] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [selector, setSelector] = useState("");
 
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -155,11 +157,14 @@ export default function ImageDownloaderPage() {
     setScanSuccess(null);
 
     try {
-      const res = await scanWebpageForImages(webpageUrl);
+      const res = await scanWebpageForImages(webpageUrl, selector);
       if (res.urls && res.urls.length > 0) {
         const urlsText = res.urls.join("\n");
         setInputText(urlsText);
-        setScanSuccess(`Successfully extracted ${res.urls.length} unique image URLs from the page! Review them below or click Download Images.`);
+        const successMsg = selector 
+          ? `Successfully extracted ${res.urls.length} unique image URLs matching selector "${selector}"! Review them below or click Download Images.`
+          : `Successfully extracted ${res.urls.length} unique image URLs from the page! Review them below or click Download Images.`;
+        setScanSuccess(successMsg);
         setInputMethod("paste"); // Switch back so they can see/edit
       } else {
         setError("No images were found on the page. Try checking the URL or use a different site.");
@@ -407,6 +412,58 @@ This text contains both URLs and custom comments. The engine will auto-detect al
                         </>
                       )}
                     </button>
+                  </div>
+
+                  {/* Advanced CSS Selector Filter Panel */}
+                  <div className="space-y-3 pt-2">
+                    <button 
+                      onClick={() => setShowAdvanced(!showAdvanced)}
+                      className="text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <span>{showAdvanced ? "▼ Hide Filter Options" : "▶ Show Filter Options (CSS Selector)"}</span>
+                    </button>
+
+                    {showAdvanced && (
+                      <div className="p-4 rounded-2xl bg-slate-100/50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 space-y-3 animate-fadeIn">
+                        <div>
+                          <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                            CSS Selector / Section (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={selector}
+                            onChange={(e) => setSelector(e.target.value)}
+                            placeholder="e.g. .gallery, #main-content, article"
+                            className="w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-100 transition-colors"
+                          />
+                        </div>
+                        
+                        {/* Selector presets */}
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          <span className="text-[10px] font-semibold text-slate-500">Presets:</span>
+                          {['main', 'article', '.gallery', '#content'].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setSelector(preset)}
+                              className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-500 dark:hover:border-indigo-400 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
+                            >
+                              {preset}
+                            </button>
+                          ))}
+                          {selector && (
+                            <button
+                              key="clear-selector"
+                              type="button"
+                              onClick={() => setSelector("")}
+                              className="text-[10px] font-bold text-red-500 hover:underline ml-1 cursor-pointer"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   
                   {inputText && (
