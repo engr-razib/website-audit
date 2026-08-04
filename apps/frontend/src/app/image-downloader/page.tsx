@@ -251,7 +251,7 @@ This text contains both URLs and custom comments. The engine will auto-detect al
           </div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
             <ImageIcon className="h-6 w-6 text-indigo-500" />
-            Batch Image Downloader
+            Bulk Image Downloader
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Paste text containing multiple image URLs or enter a website URL. The tool will parse, download locally to a folder, and generate a ZIP archive with an Excel report.
