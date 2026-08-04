@@ -1,0 +1,25 @@
+User-Agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard/
+
+User-Agent: OAI-SearchBot
+User-Agent: ChatGPT-User
+User-Agent: PerplexityBot
+Allow: /
+Disallow: /api/
+Disallow: /dashboard/
+
+User-Agent: GPTBot
+User-Agent: ClaudeBot
+User-Agent: Google-Extended
+User-Agent: Applebot-Extended
+User-Agent: FacebookBot
+User-Agent: CCBot
+User-Agent: cohere-ai
+User-Agent: Bytespider
+User-Agent: Diffbot
+User-Agent: Omgilibot
+Disallow: /
+
+Sitemap: https://audit.razib.bd/sitemap.xml

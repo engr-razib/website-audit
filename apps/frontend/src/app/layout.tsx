@@ -47,6 +47,14 @@ export const metadata: Metadata = {
     description:
       "Comprehensive 6-in-1 Website Audit by Razib: Font Licensing Classification, CTA Design, Alt Tag & SEO Compliance Scanner.",
     siteName: "Website Audit by Razib",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Website Audit by Razib - Font Licensing, CTA Audit, and SEO Compliance Scanner",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
@@ -54,6 +62,7 @@ export const metadata: Metadata = {
     description:
       "Comprehensive 6-in-1 Website Audit by Razib: Font Licensing Classification, CTA Design, Alt Tag & SEO Compliance Scanner.",
     creator: "@razibhossain",
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,
@@ -65,6 +74,9 @@ export const metadata: Metadata = {
       "max-image-preview": "large",
       "max-snippet": -1,
     },
+  },
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
   },
   alternates: {
     canonical: siteUrl,
