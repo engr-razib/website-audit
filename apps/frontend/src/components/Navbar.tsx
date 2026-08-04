@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Server, Sparkles, Activity, Globe, Key, Home, LayoutDashboard, BookOpen, FileText, Sun, Moon, Image as ImageIcon, ChevronDown, Mail } from "lucide-react";
+import { Server, Sparkles, Activity, Globe, Key, Home, LayoutDashboard, BookOpen, FileText, Sun, Moon, Image as ImageIcon, ChevronDown, Mail, Menu, X } from "lucide-react";
 import { checkBackendHealth, API_BASE, checkBrowserlessConnection, getBrowserlessKeyStatus, syncBrowserlessKeyWithBackend } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "./ui/badge";
@@ -21,6 +21,12 @@ export function Navbar() {
 
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Auto-close mobile menu on page navigation
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
   // Template Switcher & Alert Toast states
   const [activeTemplate, setActiveTemplate] = useState("Modern Slate (Default)");
@@ -328,7 +334,7 @@ export function Navbar() {
           <div className="flex items-center gap-4">
             {/* Main Nav Items */}
             <nav 
-              className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-xl border border-slate-200 dark:border-slate-800/80 text-xs font-semibold"
+              className="hidden lg:flex items-center gap-1 bg-slate-100 dark:bg-slate-900/60 p-1 rounded-xl border border-slate-200 dark:border-slate-800/80 text-xs font-semibold"
               onMouseLeave={() => setHoveredPath(null)}
             >
               {[
@@ -394,8 +400,80 @@ export function Navbar() {
                 )}
               </button>
             </nav>
+
+            {/* Mobile Controls (Theme Toggle & Hamburger Trigger) */}
+            <div className="flex lg:hidden items-center gap-2">
+              {/* Mobile Theme Toggle */}
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+                aria-label="Toggle Theme"
+              >
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4 text-amber-400" />
+                ) : (
+                  <Moon className="h-4 w-4 text-slate-700" />
+                )}
+              </button>
+
+              {/* Hamburger Button */}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                aria-label="Toggle Menu"
+              >
+                {mobileMenuOpen ? (
+                  <X className="h-4 w-4" />
+                ) : (
+                  <Menu className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Mobile Menu Panel */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25, ease: "easeInOut" }}
+              className="lg:hidden border-t border-slate-200 dark:border-slate-800/80 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl overflow-hidden"
+            >
+              <div className="px-4 pt-2.5 pb-6 space-y-1.5 sm:px-6">
+                {[
+                  { label: "Home", href: "/", icon: Home },
+                  { label: "Audit Center", href: "/audit", icon: LayoutDashboard },
+                  { label: "Bulk Image Downloader", href: "/image-downloader", icon: ImageIcon },
+                  { label: "Case Study", href: "/case-study", icon: FileText },
+                  { label: "Guides", href: "/guides", icon: BookOpen },
+                  { label: "Contact", href: "/contact", icon: Mail },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(item.href + "/");
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                        active
+                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/10"
+                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900/60 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      <Icon className={`h-4 w-4 ${active ? "text-white" : "text-slate-500 dark:text-slate-400"}`} />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* Floating Success Alert Toast for template switcher */}
