@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Heart, ExternalLink, Sparkles, BookOpen, FileText, Home, LayoutDashboard, Mail } from "lucide-react";
+import { Heart, ExternalLink, Sparkles, BookOpen, FileText, Home, LayoutDashboard, Mail, Scale } from "lucide-react";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -57,6 +57,12 @@ export function Footer() {
                 <Link href="/contact" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">
                   <Mail className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                   Contact Us
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-400">
+                  <Scale className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  Terms &amp; Compliance
                 </Link>
               </li>
             </ul>
@@ -143,6 +149,13 @@ export function Footer() {
               <span>⬇️</span> Instant Results &amp; Downloads
             </span>
           </div>
+        </div>
+
+        {/* Compliance & Legal Disclaimer */}
+        <div className="pt-6 border-t border-slate-200 dark:border-slate-800/80 text-center max-w-7xl mx-auto">
+          <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 leading-relaxed italic">
+            Disclaimer: This auditing tool is designed for website owners, managers, and authorized developers to analyze and test their own websites. Users are solely responsible for ensuring compliance with the Terms of Service, robots.txt directives, and copyrights of any target domains scanned or resources&nbsp;downloaded.
+          </p>
         </div>
 
         {/* Bottom copyright bar */}

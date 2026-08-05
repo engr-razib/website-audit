@@ -5,6 +5,7 @@ const axios = require('axios');
 const { chromium } = require('playwright');
 const AdmZip = require('adm-zip');
 const { crawlInternalUrls } = require('./siteCrawlerEngine');
+const { isUrlAllowed } = require('./robotsService');
 
 // Helper to sanitize filename
 function getSafeImageFilename(url, contentType, index) {
@@ -101,6 +102,12 @@ async function runCustomCrawl({
     // 1. Parse excel headers
     const headers = await parseExcelHeaders(excelTemplateBuffer);
     
+    // Check robots.txt compliance for starting URL
+    const allowed = await isUrlAllowed(url, 'AuditBot');
+    if (!allowed) {
+        throw new Error(`The target URL is disallowed by the website's robots.txt policy.`);
+    }
+    
     // 2. Launch browser
     let browser = null;
     let page = null;
@@ -128,7 +135,7 @@ async function runCustomCrawl({
     if (browser) {
         try {
             const context = await browser.newContext({
-                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 (compatible; AuditBot/1.0; +https://audit.razib.bd/bot)'
             });
             page = await context.newPage();
         } catch (e) {
@@ -195,7 +202,7 @@ async function runCustomCrawl({
                     responseType: 'arraybuffer',
                     timeout: 10000,
                     headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 (compatible; AuditBot/1.0; +https://audit.razib.bd/bot)'
                     }
                 });
                 buffer = Buffer.from(response.data);
@@ -323,6 +330,10 @@ async function runCustomCrawl({
 
         for (let idx = 0; idx < imageDownloadQueue.length; idx++) {
             const task = imageDownloadQueue[idx];
+            
+            // Wait 100ms to avoid flooding the server with image requests
+            await new Promise(resolve => setTimeout(resolve, 100));
+
             try {
                 // Generate a safe unique filename
                 const safeName = getSafeImageFilename(task.url, null, idx + 1);
@@ -464,7 +475,7 @@ async function extractCheerio(url, containerSelector, headers, mappings) {
         console.log(`[+] Extracting data via Axios + Cheerio: ${url}`);
         const response = await axios.get(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 (compatible; AuditBot/1.0; +https://audit.razib.bd/bot)'
             },
             timeout: 15000
         });

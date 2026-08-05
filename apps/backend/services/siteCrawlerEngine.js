@@ -4,9 +4,12 @@ const xml2js = require('xml2js');
 const path = require('path');
 const fs = require('fs');
 const { classifyFont } = require('./fontClassificationService');
+const { isUrlAllowed } = require('./robotsService');
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 (compatible; AuditBot/1.0; +https://audit.razib.bd/bot)'
 };
 
 function parseInlineStyles(styleAttr) {
@@ -56,6 +59,11 @@ async function fetchSitemapUrlsCheerio(sitemapUrl) {
 
 // Dual Mode Sitemap Fetch
 async function fetchSitemapUrls(browser, sitemapUrl) {
+    const allowed = await isUrlAllowed(sitemapUrl, 'AuditBot');
+    if (!allowed) {
+        throw new Error(`The sitemap URL is disallowed by the website's robots.txt policy.`);
+    }
+
     if (browser) {
         try {
             console.log(`[+] Fetching XML Sitemap via Playwright Browser: ${sitemapUrl}`);
@@ -81,6 +89,11 @@ async function fetchSitemapUrls(browser, sitemapUrl) {
 
 // Cheerio Crawling Fallback
 async function crawlInternalUrlsCheerio(startUrl, maxPages) {
+    const allowedStart = await isUrlAllowed(startUrl, 'AuditBot');
+    if (!allowedStart) {
+        throw new Error(`The starting URL is disallowed by the website's robots.txt policy.`);
+    }
+
     console.log(`[+] Crawling internal URLs via Axios + Cheerio: ${startUrl}`);
     const urls = new Set();
     urls.add(startUrl);
@@ -94,6 +107,14 @@ async function crawlInternalUrlsCheerio(startUrl, maxPages) {
             const currentUrl = queue.shift();
             if (visited.has(currentUrl)) continue;
             visited.add(currentUrl);
+
+            const allowed = await isUrlAllowed(currentUrl, 'AuditBot');
+            if (!allowed) {
+                console.warn(`    [!] Skipping disallowed link: ${currentUrl} (by robots.txt)`);
+                continue;
+            }
+
+            await sleep(1000);
 
             try {
                 console.log(`    [-] Crawling link: ${currentUrl} (Queue size: ${queue.length}, Total found: ${urls.size})`);
@@ -141,6 +162,11 @@ async function crawlInternalUrlsCheerio(startUrl, maxPages) {
 
 // Dual Mode Crawling
 async function crawlInternalUrls(browser, startUrl, maxPages) {
+    const allowedStart = await isUrlAllowed(startUrl, 'AuditBot');
+    if (!allowedStart) {
+        throw new Error(`The starting URL is disallowed by the website's robots.txt policy.`);
+    }
+
     if (browser) {
         console.log(`[+] Crawling internal URLs via Playwright Browser: ${startUrl}`);
         const urls = new Set();
@@ -157,6 +183,14 @@ async function crawlInternalUrls(browser, startUrl, maxPages) {
                 const currentUrl = queue.shift();
                 if (visited.has(currentUrl)) continue;
                 visited.add(currentUrl);
+
+                const allowed = await isUrlAllowed(currentUrl, 'AuditBot');
+                if (!allowed) {
+                    console.warn(`    [!] Skipping disallowed link: ${currentUrl} (by robots.txt)`);
+                    continue;
+                }
+
+                await sleep(1000);
 
                 try {
                     console.log(`    [-] Crawling link: ${currentUrl} (Queue size: ${queue.length}, Total found: ${urls.size})`);
@@ -1131,6 +1165,11 @@ async function auditSinglePageCheerio(url, findingType, findingValue) {
 
 // Router function selecting Cheerio or Playwright browser connection based on environment and status
 async function auditSinglePage(browser, url, findingType = "font", findingValue = "Dinot", screenshotsDir = null, ssCounter = { val: 1 }) {
+    const allowed = await isUrlAllowed(url, 'AuditBot');
+    if (!allowed) {
+        throw new Error(`This URL is disallowed by the website's robots.txt policy.`);
+    }
+
     if (browser) {
         try {
             return await auditSinglePagePlaywright(browser, url, findingType, findingValue, screenshotsDir, ssCounter);
