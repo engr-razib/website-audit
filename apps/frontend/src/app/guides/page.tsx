@@ -677,6 +677,8 @@ export default function GuidesPage() {
             return (
               <motion.article
                 key={guide.id}
+                id={guide.id}
+                data-testid="guide-card"
                 whileHover={{ y: -4 }}
                 className="rounded-3xl bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 p-6 sm:p-8 space-y-6 shadow-sm dark:shadow-none backdrop-blur-xl flex flex-col justify-between"
               >
@@ -686,20 +688,32 @@ export default function GuidesPage() {
                       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
                         <Icon className="h-5 w-5" />
                       </div>
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${guide.badgeColor}`}>
+                      <span 
+                        data-testid="guide-category"
+                        className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${guide.badgeColor}`}
+                      >
                         {guide.category}
                       </span>
                     </div>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                    <span 
+                      data-testid="guide-read-time"
+                      className="text-xs text-slate-500 dark:text-slate-400 font-medium"
+                    >
                       {guide.readTime}
                     </span>
                   </div>
 
                   <div className="space-y-2">
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white leading-snug">
+                    <h3 
+                      data-testid="guide-title"
+                      className="text-xl font-bold text-slate-900 dark:text-white leading-snug"
+                    >
                       {guide.title}
                     </h3>
-                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                    <p 
+                      data-testid="guide-summary"
+                      className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed"
+                    >
                       {guide.summary}
                     </p>
                   </div>

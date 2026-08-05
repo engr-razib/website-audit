@@ -62,6 +62,16 @@ export default function CustomCrawlerPage() {
     };
   }, []);
 
+  const loadSandboxConfig = () => {
+    const guidesUrl = typeof window !== "undefined" 
+      ? window.location.origin + "/guides/" 
+      : "http://localhost:3001/guides/";
+    setWebpageUrl(guidesUrl);
+    setContainerSelector('[data-testid="guide-card"]');
+    setSuccess("Sandbox demo configuration loaded! Download the sample template and drag & drop it below.");
+    setError(null);
+  };
+
   // Convert Excel file to base64 and parse headers
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -84,8 +94,20 @@ export default function CustomCrawlerPage() {
         // Generate smart default mappings
         const defaultMappings: Record<string, CustomCrawlMapping> = {};
         res.headers.forEach((h) => {
-          const lower = h.toLowerCase();
-          if (lower.includes("image") || lower.includes("photo") || lower.includes("pic") || lower.includes("thumb") || lower.includes("src")) {
+          const lower = h.toLowerCase().trim();
+          
+          // Match our pre-built sandbox template headers
+          if (lower === "guide id") {
+            defaultMappings[h] = { selector: '[data-testid="guide-card"]', type: "attr", attrName: "id" };
+          } else if (lower === "category") {
+            defaultMappings[h] = { selector: '[data-testid="guide-category"]', type: "text" };
+          } else if (lower === "read time") {
+            defaultMappings[h] = { selector: '[data-testid="guide-read-time"]', type: "text" };
+          } else if (lower === "guide title") {
+            defaultMappings[h] = { selector: '[data-testid="guide-title"]', type: "text" };
+          } else if (lower === "summary overview") {
+            defaultMappings[h] = { selector: '[data-testid="guide-summary"]', type: "text" };
+          } else if (lower.includes("image") || lower.includes("photo") || lower.includes("pic") || lower.includes("thumb") || lower.includes("src")) {
             defaultMappings[h] = { selector: "img", type: "attr", attrName: "src" };
           } else if (lower.includes("link") || lower.includes("url") || lower.includes("href") || lower.includes("website")) {
             defaultMappings[h] = { selector: "a", type: "attr", attrName: "href" };
@@ -413,6 +435,49 @@ export default function CustomCrawlerPage() {
                   </>
                 )}
               </button>
+            </div>
+
+            {/* Sandbox Testing Guide Card */}
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-gradient-to-r from-blue-50/50 via-indigo-50/30 to-purple-50/50 dark:from-blue-950/25 dark:via-indigo-950/15 dark:to-purple-950/25 p-6 shadow-md backdrop-blur-xl space-y-4">
+              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-100 dark:border-slate-800/60 pb-2">
+                <Sparkles className="h-4 w-4 text-blue-500 animate-pulse" />
+                Quick Test Sandbox
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Don't have a template? Test this feature instantly using our pre-built Excel template on the website's own guides/documentation list!
+              </p>
+              
+              <div className="space-y-3 pt-1">
+                {/* Step 1: Download Template */}
+                <a
+                  href="/custom_crawl_template.xlsx"
+                  download
+                  className="flex items-center justify-between w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 text-xs font-semibold text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-all group"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 text-[10px]">1</span>
+                    Download Excel Template
+                  </span>
+                  <Download className="h-3.5 w-3.5 text-slate-400 group-hover:text-blue-500 group-hover:scale-110 transition-all" />
+                </a>
+
+                {/* Step 2: Auto-Load Sandbox Config */}
+                <button
+                  type="button"
+                  onClick={loadSandboxConfig}
+                  className="flex items-center justify-between w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 text-xs font-semibold text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-all group cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 text-[10px]">2</span>
+                    Load Sandbox Settings
+                  </span>
+                  <Link2 className="h-3.5 w-3.5 text-slate-400 group-hover:text-blue-500 group-hover:rotate-45 transition-all" />
+                </button>
+              </div>
+
+              <div className="rounded-lg bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/10 dark:border-blue-500/20 p-3 text-[10px] text-slate-500 dark:text-slate-400 leading-normal">
+                💡 <strong>How to test:</strong> Click button (2) above to auto-configure settings. Then upload the downloaded Excel template. The selectors map automatically. Hit <strong>Start Crawling</strong>!
+              </div>
             </div>
           </div>
 

@@ -4,6 +4,7 @@ const fs = require('fs');
 const axios = require('axios');
 const { chromium } = require('playwright');
 const AdmZip = require('adm-zip');
+const cheerio = require('cheerio');
 const { crawlInternalUrls } = require('./siteCrawlerEngine');
 const { isUrlAllowed } = require('./robotsService');
 
@@ -230,6 +231,8 @@ async function runCustomCrawl({
         if (page) {
             try {
                 await page.goto(currentUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                // Wait for Next.js hydration or client rendering to complete
+                await page.waitForTimeout(1500);
                 // Playwright extraction
                 itemsOnPage = await page.evaluate(({ containerSelector, headers, mappings, currentUrl }) => {
                     const items = [];
