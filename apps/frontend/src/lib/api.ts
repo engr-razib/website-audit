@@ -327,5 +327,99 @@ export async function scanWebpageForImages(url: string, selector?: string): Prom
   }
 }
 
+export interface CustomCrawlMapping {
+  selector: string;
+  type: 'text' | 'attr';
+  attrName?: string;
+}
+
+export interface CustomCrawlRequest {
+  url: string;
+  crawlOption: 'data' | 'data-and-images';
+  maxPages: number;
+  containerSelector?: string;
+  mappings: Record<string, CustomCrawlMapping>;
+  xlsxBase64: string;
+}
+
+export interface CustomCrawlJobStatus {
+  jobId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress: {
+    current: number;
+    total: number;
+    currentUrl: string;
+    percent: number;
+  };
+  createdAt: string;
+  completedAt: string | null;
+  headers: string[];
+  data: Record<string, any>[];
+  downloadUrls?: {
+    excel: string;
+    zip?: string | null;
+  } | null;
+  error?: string | null;
+}
+
+export async function parseExcelHeaders(fileBase64: string): Promise<{ headers: string[] }> {
+  try {
+    const res = await fetch(`${API_BASE}/custom-crawler/parse-headers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileBase64 }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Parsing excel headers failed' }));
+      throw new Error(err.error || 'Parsing excel headers failed');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message && err.message !== 'Failed to fetch') {
+      throw err;
+    }
+    throw new Error('Backend server is offline or unreachable.');
+  }
+}
+
+export async function startCustomCrawlJob(data: CustomCrawlRequest): Promise<{ jobId: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/custom-crawler/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Custom crawl job start failed' }));
+      throw new Error(err.error || 'Custom crawl job start failed');
+    }
+    return await res.json();
+  } catch (err: any) {
+    if (err.message && err.message !== 'Failed to fetch') {
+      throw err;
+    }
+    throw new Error('Backend server is offline or unreachable.');
+  }
+}
+
+export async function getCustomCrawlJobStatus(jobId: string): Promise<CustomCrawlJobStatus> {
+  try {
+    const res = await fetch(`${API_BASE}/custom-crawler/jobs/${jobId}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('Failed to fetch job status');
+    return await res.json();
+  } catch (err: any) {
+    throw new Error(err.message === 'Failed to fetch' ? 'Backend server is offline' : err.message || 'Failed to fetch job status');
+  }
+}
+
+export function getCustomCrawlExcelDownloadUrl(jobId: string): string {
+  return `${API_BASE}/custom-crawler/jobs/${jobId}/download/excel`;
+}
+
+export function getCustomCrawlZipDownloadUrl(jobId: string): string {
+  return `${API_BASE}/custom-crawler/jobs/${jobId}/download/zip`;
+}
+
+
 
 

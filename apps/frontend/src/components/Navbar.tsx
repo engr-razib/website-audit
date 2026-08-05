@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Server, Sparkles, Activity, Globe, Key, Home, LayoutDashboard, BookOpen, FileText, Sun, Moon, Image as ImageIcon, ChevronDown, Mail, Menu, X } from "lucide-react";
+import { Server, Sparkles, Activity, Globe, Key, Home, LayoutDashboard, BookOpen, FileText, Sun, Moon, Image as ImageIcon, ChevronDown, Mail, Menu, X, Database } from "lucide-react";
 import { checkBackendHealth, API_BASE, checkBrowserlessConnection, getBrowserlessKeyStatus, syncBrowserlessKeyWithBackend } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "./ui/badge";
@@ -341,6 +341,7 @@ export function Navbar() {
                 { label: "Home", href: "/", icon: Home },
                 { label: "Audit Center", href: "/audit", icon: LayoutDashboard },
                 { label: "Bulk Image Downloader", href: "/image-downloader", icon: ImageIcon },
+                { label: "Custom Crawling", href: "/custom-crawler", icon: Database },
                 { label: "Case Study", href: "/case-study", icon: FileText },
                 { label: "Guides", href: "/guides", icon: BookOpen },
                 { label: "Contact", href: "/contact", icon: Mail },
@@ -448,6 +449,7 @@ export function Navbar() {
                   { label: "Home", href: "/", icon: Home },
                   { label: "Audit Center", href: "/audit", icon: LayoutDashboard },
                   { label: "Bulk Image Downloader", href: "/image-downloader", icon: ImageIcon },
+                  { label: "Custom Crawling", href: "/custom-crawler", icon: Database },
                   { label: "Case Study", href: "/case-study", icon: FileText },
                   { label: "Guides", href: "/guides", icon: BookOpen },
                   { label: "Contact", href: "/contact", icon: Mail },

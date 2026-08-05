@@ -7,6 +7,7 @@ const { chromium } = require('playwright');
 const { fetchSitemapUrls, crawlInternalUrls, auditSinglePage } = require('./services/siteCrawlerEngine');
 const { generateExcelReport } = require('./services/excelExportService');
 const { cleanOutputs } = require('./cleanup_outputs');
+const { parseExcelHeaders, runCustomCrawl } = require('./services/customCrawlerEngine');
 
 // Run automatic output cleanup on server startup & schedule every 6 hours (cleaning files > 24 hours)
 cleanOutputs();
@@ -1112,6 +1113,171 @@ app.post('/api/image-downloader/scan-page', async (req, res) => {
         source: playwrightScanSucceeded ? 'playwright' : 'cheerio',
         urls: extractedUrls
     });
+});
+
+// In-Memory Custom Crawler Jobs State
+const customCrawlJobs = {};
+
+/**
+ * Custom Crawler Endpoints
+ */
+
+// 1. Parse Excel Headers
+app.post('/api/custom-crawler/parse-headers', async (req, res) => {
+    const { fileBase64 } = req.body;
+    if (!fileBase64) {
+        return res.status(400).json({ error: 'Excel file as base64 string is required' });
+    }
+
+    try {
+        const fileBuffer = Buffer.from(fileBase64, 'base64');
+        const headers = await parseExcelHeaders(fileBuffer);
+        res.json({ headers });
+    } catch (err) {
+        console.error('[!] Failed to parse Excel template:', err.message);
+        res.status(400).json({ error: err.message || 'Failed to parse Excel file headers' });
+    }
+});
+
+// 2. Start Custom Crawling Job
+app.post('/api/custom-crawler/start', async (req, res) => {
+    const { url, crawlOption = 'data', maxPages = 10, containerSelector, mappings, xlsxBase64 } = req.body;
+
+    if (!url) {
+        return res.status(400).json({ error: 'Starting URL is required' });
+    }
+    if (!xlsxBase64) {
+        return res.status(400).json({ error: 'Excel template file (.xlsx) as base64 is required' });
+    }
+    if (!mappings || typeof mappings !== 'object') {
+        return res.status(400).json({ error: 'Mappings configuration is required' });
+    }
+
+    const jobId = uuidv4();
+    const jobDir = path.join(OUTPUTS_DIR, `custom-crawl-${jobId}`);
+    fs.mkdirSync(jobDir, { recursive: true });
+
+    customCrawlJobs[jobId] = {
+        jobId,
+        status: 'pending',
+        progress: { current: 0, total: 0, currentUrl: '', percent: 0 },
+        url,
+        crawlOption,
+        maxPages,
+        createdAt: new Date().toISOString(),
+        completedAt: null,
+        excelPath: null,
+        zipPath: null,
+        headers: [],
+        data: [],
+        error: null
+    };
+
+    // Run asynchronously
+    (async () => {
+        const job = customCrawlJobs[jobId];
+        job.status = 'running';
+
+        try {
+            const excelBuffer = Buffer.from(xlsxBase64, 'base64');
+            const result = await runCustomCrawl({
+                jobId,
+                url,
+                crawlOption,
+                maxPages: parseInt(maxPages) || 10,
+                containerSelector,
+                mappings,
+                excelTemplateBuffer: excelBuffer,
+                jobDir,
+                browserlessKey: BROWSERLESS_API_KEY,
+                updateProgress: (current, total, currentUrl, dataSoFar) => {
+                    job.progress = {
+                        current,
+                        total,
+                        currentUrl,
+                        percent: total > 0 ? Math.round((current / total) * 100) : 0
+                    };
+                    job.data = dataSoFar;
+                }
+            });
+
+            job.excelPath = result.excelPath;
+            job.zipPath = result.zipPath;
+            job.headers = result.headers;
+            job.data = result.data;
+            job.status = 'completed';
+            job.completedAt = new Date().toISOString();
+        } catch (err) {
+            console.error(`[!] Custom crawl job ${jobId} failed:`, err);
+            job.status = 'failed';
+            job.error = err.message || 'Crawl job failed unexpectedly';
+            job.completedAt = new Date().toISOString();
+        }
+    })();
+
+    res.json({
+        message: 'Custom crawl job started successfully',
+        jobId
+    });
+});
+
+// 3. Get Custom Crawl Job Status
+app.get('/api/custom-crawler/jobs/:jobId', (req, res) => {
+    const { jobId } = req.params;
+    const job = customCrawlJobs[jobId];
+
+    if (!job) {
+        return res.status(404).json({ error: 'Crawl job not found' });
+    }
+
+    res.json({
+        jobId: job.jobId,
+        status: job.status,
+        progress: job.progress,
+        createdAt: job.createdAt,
+        completedAt: job.completedAt,
+        headers: job.headers,
+        data: job.data,
+        downloadUrls: job.status === 'completed' ? {
+            excel: `/api/custom-crawler/jobs/${jobId}/download/excel`,
+            zip: job.zipPath ? `/api/custom-crawler/jobs/${jobId}/download/zip` : null
+        } : null,
+        error: job.error
+    });
+});
+
+// 4. Download custom crawled Excel
+app.get('/api/custom-crawler/jobs/:jobId/download/excel', (req, res) => {
+    const { jobId } = req.params;
+    const job = customCrawlJobs[jobId];
+
+    if (!job || job.status !== 'completed' || !job.excelPath || !fs.existsSync(job.excelPath)) {
+        return res.status(404).json({ error: 'Excel file not available' });
+    }
+
+    const filename = `custom_crawled_data_${jobId.slice(0, 8)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+    res.sendFile(path.resolve(job.excelPath));
+});
+
+// 5. Download custom crawled ZIP (Excel + Images)
+app.get('/api/custom-crawler/jobs/:jobId/download/zip', (req, res) => {
+    const { jobId } = req.params;
+    const job = customCrawlJobs[jobId];
+
+    if (!job || job.status !== 'completed' || !job.zipPath || !fs.existsSync(job.zipPath)) {
+        return res.status(404).json({ error: 'ZIP file not available' });
+    }
+
+    const filename = `custom_crawled_archive_${jobId.slice(0, 8)}.zip`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+    res.sendFile(path.resolve(job.zipPath));
 });
 
 const server = app.listen(PORT, () => {
