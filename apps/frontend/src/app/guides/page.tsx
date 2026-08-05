@@ -29,7 +29,7 @@ import { Badge } from "@/components/ui/badge";
 
 interface GuideArticle {
   id: string;
-  category: "User Workflow" | "Font Licensing" | "CTA Design" | "Alt & SEO" | "Crawling & Reports";
+  category: "User Workflow" | "Font Licensing" | "CTA Design" | "Alt & SEO" | "Crawling & Reports" | "Image Downloader";
   title: string;
   readTime: string;
   summary: string;
@@ -372,6 +372,141 @@ https://razib.bd/guides`,
       ],
     },
   },
+  {
+    id: "bulk-image-downloader-scan-selectors",
+    category: "Image Downloader",
+    title: "How to Scan & Download Webpage Images by CSS Selectors",
+    readTime: "4 min read",
+    summary:
+      "A complete guide on targeting specific webpage layouts using custom selectors to crawl, download, and pack image assets in bulk.",
+    icon: ImageIcon,
+    badgeColor: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30",
+    content: {
+      overview:
+        "The Website Scanner launches a headless browser to render JavaScript-heavy sites and capture images. To download only the files you need (like product galleries or blog figures), you can configure CSS selectors to filter assets.",
+      steps: [
+        {
+          stepNumber: 1,
+          title: "Select 'Scan Website URL' Option",
+          desc: "Switch the Input Method toggle to 'Scan Website URL' in the Bulk Image Downloader dashboard.",
+        },
+        {
+          stepNumber: 2,
+          title: "Input Target Page URL",
+          desc: "Provide the absolute URL of the page you want to scrape (e.g. https://www.example.com/shop).",
+        },
+        {
+          stepNumber: 3,
+          title: "Configure Custom CSS Selector (Optional)",
+          desc: "Click 'Advanced Settings' and enter a CSS selector (e.g. '.product-gallery img' or 'main article img') to isolate specific page divisions.",
+        },
+        {
+          stepNumber: 4,
+          title: "Start Extraction & Download",
+          desc: "Click 'Scan Webpage' to pull URLs. Verify them in the input box, then click 'Download Images' to create your ZIP package.",
+        },
+      ],
+      keyTakeaways: [
+        "Headless Chromium executes scripts to capture lazy-loaded images accurately.",
+        "Advanced selector scoping excludes decorative spacers, avatars, and social icons.",
+        "Automatic fallback routines bypass cross-origin referrer restrictions.",
+      ],
+      codeSnippet: `// Useful Scoping Selector Examples:
+.gallery-container img    // Only images inside .gallery-container
+main article img          // Only content articles images
+img[src*="/products/"]    // Images with "/products/" in their source path`,
+      bestPractices: [
+        "Test your CSS selector in browser console via document.querySelectorAll('.your-selector') before saving.",
+        "Leave the selector empty to capture all page image elements.",
+        "Ensure your target URL starts with http:// or https://.",
+      ],
+    },
+  },
+  {
+    id: "bulk-image-downloader-paste-extraction",
+    category: "Image Downloader",
+    title: "Pasting Raw Content for Automated Image URL Extraction",
+    readTime: "3 min read",
+    summary:
+      "Learn how to copy and paste unstructured text, HTML logs, or markdown files to automatically pull out valid image URLs.",
+    icon: Sliders,
+    badgeColor: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+    content: {
+      overview:
+        "If you already have a log, copy text, or database export containing image links, the Bulk Downloader can search the content and extract matching resource locations automatically.",
+      steps: [
+        {
+          stepNumber: 1,
+          title: "Select 'Paste Text & Links' Option",
+          desc: "Choose the default Paste input mode in the Bulk Image Downloader dashboard.",
+        },
+        {
+          stepNumber: 2,
+          title: "Paste Raw Text Blocks",
+          desc: "Paste your log files, markdown articles, HTML snippets, or plain URL lists into the main text area.",
+        },
+        {
+          stepNumber: 3,
+          title: "Verify Extracted URL Count",
+          desc: "Check the Live Counter above the text area to see how many valid links the regex parser detected.",
+        },
+        {
+          stepNumber: 4,
+          title: "Launch Batch Download",
+          desc: "Click the 'Download Images' button. The engine schedules downloads, packages files, and opens the downloads directory.",
+        },
+      ],
+      keyTakeaways: [
+        "Regex parser automatically strips out dirty text, HTML brackets, and metadata around URLs.",
+        "Bypasses manually clean-formatting URL columns.",
+        "Works with http and https assets.",
+      ],
+      codeSnippet: `// Example dirty pasted text:
+"Here is the product catalog. The main banner is at
+https://example.com/assets/img/banner.png. We also have
+thumbnail icons: <img src='https://example.com/thumb.jpg'/>"
+// Parser auto-extracts:
+- https://example.com/assets/img/banner.png
+- https://example.com/thumb.jpg`,
+      bestPractices: [
+        "Verify the URL protocol (http/https) is included in the pasted data.",
+        "Avoid pasting massive documents exceeding 1MB in size to keep parsing instantaneous.",
+        "Load Sample Data first to understand how the parser functions.",
+      ],
+    },
+  },
+  {
+    id: "bulk-image-downloader-zip-excel",
+    category: "Image Downloader",
+    title: "Understanding Downloader ZIP Packages and Excel Manifests",
+    readTime: "3 min read",
+    summary:
+      "Learn about the structured ZIP files and styled Excel spreadsheets generated for each image downloader job.",
+    icon: FileSpreadsheet,
+    badgeColor: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
+    content: {
+      overview:
+        "Every downloader job organizes the output directory cleanly. It compiles metadata logs, renames colliding file structures, and packages everything in a ZIP file.",
+      keyTakeaways: [
+        "Outputs styled Excel spreadsheets detailing file metrics.",
+        "Ensures duplicate asset names are auto-renamed (e.g. image_1.jpg) to prevent overwriting.",
+        "Pipes zip files directly to the client browser on task completion.",
+      ],
+      codeSnippet: `// Excel Catalog Structure:
+Sheet: "Image Downloads Summary"
+Columns:
+- Original URL  (The source link extracted from text or page)
+- Filename      (The unique name saved inside the ZIP archive)
+- Size (KB)     (The downloaded file weight)
+- Duration (ms) (Total fetch-to-disk time)
+- Status        (Completed / Failed details)`,
+      bestPractices: [
+        "Use the Excel spreadsheet to coordinate database updates or content mapping grids.",
+        "For self-hosted installations, use 'Open Local Folder' to work directly on the unzipped files.",
+        "Always archive your catalog sheet to track design compliance over time.",
+      ],
+    },
+  },
 ];
 
 const FAQS = [
@@ -402,7 +537,7 @@ export default function GuidesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
 
-  const categories = ["All", "User Workflow", "Font Licensing", "CTA Design", "Alt & SEO", "Crawling & Reports"];
+  const categories = ["All", "User Workflow", "Font Licensing", "CTA Design", "Alt & SEO", "Crawling & Reports", "Image Downloader"];
 
   const filteredGuides = GUIDES.filter((guide) => {
     const matchesCategory = selectedCategory === "All" || guide.category === selectedCategory;
