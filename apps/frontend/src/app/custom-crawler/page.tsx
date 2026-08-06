@@ -61,6 +61,15 @@ export default function CustomCrawlerPage() {
 
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Dispatch active status to topbar connections
+  useEffect(() => {
+    const isJobActive = startingCrawl || (jobStatus !== null && (jobStatus.status === "running" || jobStatus.status === "pending"));
+    window.dispatchEvent(new CustomEvent('app-activity-status', { detail: { active: isJobActive } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent('app-activity-status', { detail: { active: false } }));
+    };
+  }, [startingCrawl, jobStatus]);
+
   // Parse textarea lines into a clean URL array
   const getParsedUrls = () =>
     urlsText

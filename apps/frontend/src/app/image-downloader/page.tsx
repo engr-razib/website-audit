@@ -17,7 +17,9 @@ import {
   Copy,
   Sparkles,
   Link2,
-  Globe
+  Globe,
+  Crosshair,
+  Settings
 } from "lucide-react";
 import { 
   startImageDownloadJob, 
@@ -27,7 +29,8 @@ import {
   getImageExcelDownloadUrl,
   scanWebpageForImages,
   ImageDownloadJobStatus,
-  ImageDownloadProgress
+  ImageDownloadProgress,
+  API_BASE
 } from "@/lib/api";
 
 const containerVariants = {
@@ -60,8 +63,31 @@ export default function ImageDownloaderPage() {
   const [scanSuccess, setScanSuccess] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selector, setSelector] = useState("");
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
 
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Dispatch active status to topbar connections
+  useEffect(() => {
+    const isJobActive = loading || scanning || (jobStatus !== null && (jobStatus.status === "running" || jobStatus.status === "pending"));
+    window.dispatchEvent(new CustomEvent('app-activity-status', { detail: { active: isJobActive } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent('app-activity-status', { detail: { active: false } }));
+    };
+  }, [loading, scanning, jobStatus]);
+
+  // Listen for selector picked from the visual picker iframe
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'SELECTOR_PICKED' && isPickerOpen) {
+        const { selector: pickedSelector } = e.data;
+        setSelector(pickedSelector);
+        setIsPickerOpen(false);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [isPickerOpen]);
 
   // Live URL counter
   useEffect(() => {
@@ -176,22 +202,6 @@ export default function ImageDownloaderPage() {
     }
   };
 
-  const handleOpenFolder = async () => {
-    if (!activeJobId) return;
-    setOpeningFolder(true);
-    setFolderOpenSuccess(null);
-    try {
-      const res = await openLocalFolder(activeJobId);
-      if (res.success) {
-        setFolderOpenSuccess("Folder opened successfully in Windows Explorer!");
-        setTimeout(() => setFolderOpenSuccess(null), 4000);
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to open local folder");
-    } finally {
-      setOpeningFolder(false);
-    }
-  };
 
   const handleReset = () => {
     if (pollingTimerRef.current) {
@@ -414,56 +424,57 @@ This text contains both URLs and custom comments. The engine will auto-detect al
                     </button>
                   </div>
 
-                  {/* Advanced CSS Selector Filter Panel */}
+                  {/* Target Container Wrapper Selector (Visual Picker or Manual Input) */}
                   <div className="space-y-3 pt-2">
-                    <button 
-                      onClick={() => setShowAdvanced(!showAdvanced)}
-                      className="text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1 transition-colors cursor-pointer"
-                    >
-                      <span>{showAdvanced ? "▼ Hide Filter Options" : "▶ Show Filter Options (CSS Selector)"}</span>
-                    </button>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        <span>Target Wrapper / Section (Optional)</span>
+                      </label>
+                      {webpageUrl.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => setIsPickerOpen(true)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold transition-all cursor-pointer border border-indigo-500/15"
+                        >
+                          <Crosshair className="h-3 w-3 animate-pulse" />
+                          Visually Pick Wrapper Selector
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={selector}
+                        onChange={(e) => setSelector(e.target.value)}
+                        placeholder="e.g. .gallery-container, #main-content, .product-images"
+                        className="flex-1 rounded-xl border border-slate-350 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-100 transition-colors"
+                      />
+                      {selector && (
+                        <button
+                          type="button"
+                          onClick={() => setSelector("")}
+                          className="text-xs font-bold text-red-500 hover:underline cursor-pointer px-1"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
 
-                    {showAdvanced && (
-                      <div className="p-4 rounded-2xl bg-slate-100/50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 space-y-3 animate-fadeIn">
-                        <div>
-                          <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                            CSS Selector / Section (Optional)
-                          </label>
-                          <input
-                            type="text"
-                            value={selector}
-                            onChange={(e) => setSelector(e.target.value)}
-                            placeholder="e.g. .gallery, #main-content, article"
-                            className="w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-100 transition-colors"
-                          />
-                        </div>
-                        
-                        {/* Selector presets */}
-                        <div className="flex flex-wrap gap-1.5 items-center">
-                          <span className="text-[10px] font-semibold text-slate-500">Presets:</span>
-                          {['main', 'article', '.gallery', '#content'].map((preset) => (
-                            <button
-                              key={preset}
-                              type="button"
-                              onClick={() => setSelector(preset)}
-                              className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-500 dark:hover:border-indigo-400 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
-                            >
-                              {preset}
-                            </button>
-                          ))}
-                          {selector && (
-                            <button
-                              key="clear-selector"
-                              type="button"
-                              onClick={() => setSelector("")}
-                              className="text-[10px] font-bold text-red-500 hover:underline ml-1 cursor-pointer"
-                            >
-                              Clear
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                    {/* Selector presets */}
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      <span className="text-[10px] font-semibold text-slate-500">Presets:</span>
+                      {['main', 'article', '.gallery', '#content'].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setSelector(preset)}
+                          className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 hover:border-indigo-500 dark:hover:border-indigo-400 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer"
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   
                   {inputText && (
@@ -531,9 +542,6 @@ This text contains both URLs and custom comments. The engine will auto-detect al
               <p>
                 <strong>4. Automated Excel &amp; ZIP:</strong> Downloading files creates an outputs folder locally, generates an Excel report, and returns a single ZIP archive to the browser.
               </p>
-              <p>
-                <strong>5. Open local explorer:</strong> Since the service is running locally on your computer, you can hit <strong>Open Local Folder</strong> to pop open the Windows Explorer directory instantly.
-              </p>
             </div>
           </motion.div>
         ) : (
@@ -585,19 +593,6 @@ This text contains both URLs and custom comments. The engine will auto-detect al
                       <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500" />
                       Excel Report
                     </a>
-
-                    <button
-                      onClick={handleOpenFolder}
-                      disabled={openingFolder}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-950/20 border border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 font-bold text-xs disabled:opacity-50 hover:scale-103 active:scale-98 transition-all cursor-pointer"
-                    >
-                      {openingFolder ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
-                      ) : (
-                        <FolderOpen className="h-3.5 w-3.5 text-indigo-500" />
-                      )}
-                      Open Local Folder
-                    </button>
                   </div>
                 )}
               </div>
@@ -772,6 +767,111 @@ This text contains both URLs and custom comments. The engine will auto-detect al
                 </div>
               </div>
             )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Visual Selector Picker Modal ───────────────────────────── */}
+      <AnimatePresence>
+        {isPickerOpen && webpageUrl.trim() && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex flex-col md:flex-row"
+            style={{ background: 'rgba(2,8,23,0.96)' }}
+          >
+            {/* Main Web Page Preview Area */}
+            <div className="flex-1 flex flex-col h-full border-r border-slate-800">
+              {/* Modal header bar */}
+              <div className="flex items-center gap-3 px-5 py-3 bg-slate-950 border-b border-slate-800 shrink-0">
+                <Crosshair className="h-5 w-5 text-indigo-400 animate-pulse" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Visual Selector Picker</p>
+                  <p className="text-xs text-slate-300 truncate font-mono">
+                    {webpageUrl}
+                  </p>
+                </div>
+                <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 bg-slate-900 border border-slate-800 px-3 py-1 rounded-lg">
+                  <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                  Hover elements in the preview and click to select
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPickerOpen(false);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-xs font-bold text-white shadow-md shadow-indigo-500/20 transition-all cursor-pointer shrink-0"
+                >
+                  Done & Apply
+                </button>
+              </div>
+
+              {/* Iframe Pre-loader / Preview Container */}
+              <div className="flex-1 relative bg-white">
+                <iframe
+                  src={`${API_BASE}/custom-crawler/preview?url=${encodeURIComponent(webpageUrl)}`}
+                  className="w-full h-full border-0"
+                  sandbox="allow-scripts allow-same-origin"
+                  title="Visual Selector Picker"
+                />
+              </div>
+            </div>
+
+            {/* Sidebar - Column Mapper & Visual Feedback */}
+            <div className="w-full md:w-80 bg-slate-900 border-t md:border-t-0 border-slate-800 flex flex-col h-[300px] md:h-full shrink-0">
+              <div className="p-4 border-b border-slate-850 shrink-0">
+                <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-indigo-400" />
+                  Picker Info
+                </h4>
+                <p className="text-[10px] text-slate-400 mt-1 leading-normal">
+                  Click any element in the webpage preview to automatically map its selector as the target image wrapper section.
+                </p>
+              </div>
+
+              {/* Selection Card */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                <div className="p-4 rounded-xl border border-indigo-500 bg-indigo-500/10 shadow-sm shadow-indigo-500/10 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-white">
+                      Target Image Wrapper Selector
+                    </span>
+                    {selector ? (
+                      <span className="text-[9px] font-bold uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/15">
+                        Mapped
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-bold uppercase text-slate-500 bg-slate-850 px-2 py-0.5 rounded-md border border-slate-855">
+                        Empty
+                      </span>
+                    )}
+                  </div>
+
+                  {selector ? (
+                    <div className="text-[10px] font-mono text-indigo-300 dark:text-indigo-400 break-all bg-slate-950 p-2 rounded-lg border border-slate-850">
+                      {selector}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-slate-500 italic bg-slate-950/20 p-2 rounded border border-dashed border-slate-850">
+                      Click element on page to map
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="p-4 border-t border-slate-850 bg-slate-950/40 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPickerOpen(false);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-xs font-bold text-white transition-all cursor-pointer text-center"
+                >
+                  Apply & Close
+                </button>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

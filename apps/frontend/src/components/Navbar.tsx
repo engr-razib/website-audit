@@ -22,6 +22,16 @@ export function Navbar() {
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isActiveUsage, setIsActiveUsage] = useState(false);
+
+  useEffect(() => {
+    const handleActivity = (e: Event) => {
+      const active = (e as CustomEvent).detail?.active;
+      setIsActiveUsage(!!active);
+    };
+    window.addEventListener('app-activity-status', handleActivity);
+    return () => window.removeEventListener('app-activity-status', handleActivity);
+  }, []);
 
   // Auto-close mobile menu on page navigation
   useEffect(() => {
@@ -242,9 +252,16 @@ export function Navbar() {
                 </span>
               )}
               {status === "online" && (
-                <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400" title="Backend API service is online">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Backend Connected
+                <span
+                  className={`flex items-center gap-1.5 font-bold transition-all ${
+                    isActiveUsage
+                      ? "text-blue-600 dark:text-blue-400"
+                      : "text-emerald-600 dark:text-emerald-400"
+                  }`}
+                  title={isActiveUsage ? "Backend API is actively processing a job" : "Backend API service is online"}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${isActiveUsage ? "bg-blue-500 animate-ping" : "bg-emerald-500 animate-pulse"}`} />
+                  {isActiveUsage ? "Backend Connected (In Use)" : "Backend Connected"}
                 </span>
               )}
               {status === "offline" && (
@@ -266,9 +283,16 @@ export function Navbar() {
                     </span>
                   )}
                   {testStatus === "connected" && (
-                    <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400" title={testMessage || ''}>
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      API Key Connected
+                    <span
+                      className={`flex items-center gap-1.5 font-bold transition-all ${
+                        isActiveUsage
+                          ? "text-blue-600 dark:text-blue-400"
+                          : "text-emerald-600 dark:text-emerald-400"
+                      }`}
+                      title={isActiveUsage ? "CDP session is actively running a browser automation job" : (testMessage || '')}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${isActiveUsage ? "bg-blue-500 animate-ping" : "bg-emerald-500 animate-pulse"}`} />
+                      {isActiveUsage ? "API Key Connected (In Use)" : "API Key Connected"}
                     </span>
                   )}
                   {testStatus === "invalid_key" && (

@@ -27,6 +27,14 @@ export default function AuditPage() {
   const [mode, setMode] = useState<"quick" | "full">("quick");
   const [submittedFindingValue, setSubmittedFindingValue] = useState<string>("");
 
+  // Dispatch active status to topbar connections
+  React.useEffect(() => {
+    window.dispatchEvent(new CustomEvent('app-activity-status', { detail: { active: !!activeJobId } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent('app-activity-status', { detail: { active: false } }));
+    };
+  }, [activeJobId]);
+
   // Quick Scan handler
   const handleQuickScanComplete = useCallback((quickScanResult: any, findingValue: string) => {
     setSubmittedFindingValue(findingValue);
