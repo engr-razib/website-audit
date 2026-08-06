@@ -130,6 +130,7 @@ export interface BrowserlessStatusResponse {
   message: string;
   version?: string;
   keyConfigured?: boolean;
+  error?: string;
 }
 
 export interface BrowserlessKeyStatus {

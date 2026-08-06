@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ContactSection } from "@/components/ContactSection";
 import {
   Sparkles,
@@ -40,6 +41,108 @@ export default function CaseStudyPage() {
           </Link>
           <span>/</span>
           <span className="text-slate-900 dark:text-slate-200 font-medium">Portfolio Case Study</span>
+        </div>
+
+        {/* Feature Case Study Selection Cards */}
+        <div className="space-y-4 pt-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            Dedicated Feature Case Studies
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Audit Center Case Study Card */}
+            <Link
+              href="/case-study/audit-center"
+              className="group rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 p-4 shadow-lg hover:shadow-xl hover:border-blue-500/50 transition-all flex flex-col justify-between space-y-4"
+            >
+              <div className="space-y-3">
+                <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-slate-950">
+                  <Image
+                    src="/audit_center_preview.png"
+                    alt="Audit Center Case Study"
+                    fill
+                    className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="px-2.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase tracking-wider">
+                    STAR Case Study
+                  </span>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    Audit Center Case Study
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                    Automated Website Typography &amp; Brand Compliance Audit Microservice engineering breakdown.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center text-xs font-bold text-blue-600 dark:text-blue-400 gap-1 group-hover:translate-x-1 transition-transform pt-2 border-t border-slate-100 dark:border-slate-800/50">
+                Read Case Study <ArrowRight className="h-3.5 w-3.5" />
+              </div>
+            </Link>
+
+            {/* Image Downloader Case Study Card */}
+            <Link
+              href="/case-study/image-downloader"
+              className="group rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 p-4 shadow-lg hover:shadow-xl hover:border-purple-500/50 transition-all flex flex-col justify-between space-y-4"
+            >
+              <div className="space-y-3">
+                <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-slate-950">
+                  <Image
+                    src="/image_downloader_preview.png"
+                    alt="Image Downloader Case Study"
+                    fill
+                    className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="px-2.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 text-[10px] font-bold uppercase tracking-wider">
+                    STAR Case Study
+                  </span>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                    Bulk Image Downloader Case Study
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                    Enterprise Bulk Image Extraction &amp; Download Microservice engineering breakdown.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center text-xs font-bold text-purple-600 dark:text-purple-400 gap-1 group-hover:translate-x-1 transition-transform pt-2 border-t border-slate-100 dark:border-slate-800/50">
+                Read Case Study <ArrowRight className="h-3.5 w-3.5" />
+              </div>
+            </Link>
+
+            {/* Custom Crawling Case Study Card */}
+            <Link
+              href="/case-study/custom-crawling"
+              className="group rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 p-4 shadow-lg hover:shadow-xl hover:border-emerald-500/50 transition-all flex flex-col justify-between space-y-4"
+            >
+              <div className="space-y-3">
+                <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-slate-950">
+                  <Image
+                    src="/custom_crawling_preview.png"
+                    alt="Custom Crawling Case Study"
+                    fill
+                    className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
+                    STAR Case Study
+                  </span>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                    Custom Crawling Case Study
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                    Excel-Driven Custom Web Crawling &amp; Data Extraction Platform engineering breakdown.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center text-xs font-bold text-emerald-600 dark:text-emerald-400 gap-1 group-hover:translate-x-1 transition-transform pt-2 border-t border-slate-100 dark:border-slate-800/50">
+                Read Case Study <ArrowRight className="h-3.5 w-3.5" />
+              </div>
+            </Link>
+          </div>
         </div>
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">

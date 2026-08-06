@@ -23,7 +23,8 @@ import {
   X as XIcon,
   Plus,
   Trash2,
-  Upload
+  Upload,
+  Compass
 } from "lucide-react";
 import {
   parseExcelHeaders,
@@ -68,8 +69,19 @@ export default function CustomCrawlerPage() {
   const [isParsingExcel, setIsParsingExcel] = useState(false);
   const [invalidColumnIndices, setInvalidColumnIndices] = useState<number[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Synchronize picker mode (mapping vs browse mode) with iframe window
+  useEffect(() => {
+    if (isPickerOpen && iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({
+        type: 'SET_PICKER_MODE',
+        active: activePickerColIndex !== null
+      }, '*');
+    }
+  }, [activePickerColIndex, isPickerOpen]);
 
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1065,10 +1077,19 @@ export default function CustomCrawlerPage() {
             {/* Iframe Pre-loader / Preview Container */}
             <div className="flex-1 relative bg-white">
               <iframe
+                ref={iframeRef}
                 src={`${API_BASE}/custom-crawler/preview?url=${encodeURIComponent(getParsedUrls()[previewUrlIndex] || getParsedUrls()[0])}`}
                 className="w-full h-full border-0"
                 sandbox="allow-scripts allow-same-origin"
                 title="Visual Selector Picker"
+                onLoad={() => {
+                  if (iframeRef.current?.contentWindow) {
+                    iframeRef.current.contentWindow.postMessage({
+                      type: 'SET_PICKER_MODE',
+                      active: activePickerColIndex !== null
+                    }, '*');
+                  }
+                }}
               />
             </div>
           </div>
@@ -1081,8 +1102,56 @@ export default function CustomCrawlerPage() {
                 Columns Map Helper
               </h4>
               <p className="text-[10px] text-slate-400 mt-1 leading-normal">
-                Click a column below to activate it, then click any element on the webpage to capture its selector.
+                Click a column below to activate mapping, or select <strong>Browse / Data Explore</strong> to interact with page links and tabs.
               </p>
+            </div>
+
+            {/* Mode & Deselect Banner */}
+            <div className="p-3 bg-slate-950/80 border-b border-slate-850 shrink-0 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400">Mode:</span>
+                {activePickerColIndex !== null ? (
+                  <button
+                    type="button"
+                    onClick={() => setActivePickerColIndex(null)}
+                    className="flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/30 text-[10px] font-bold transition-all cursor-pointer"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
+                    Mapping #{activePickerColIndex + 1} (Click to Deselect)
+                  </button>
+                ) : (
+                  <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Page Browse Active
+                  </span>
+                )}
+              </div>
+
+              {/* Dedicated Browse Mode Button */}
+              <button
+                type="button"
+                onClick={() => setActivePickerColIndex(null)}
+                className={`w-full p-2 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                  activePickerColIndex === null
+                    ? "border-emerald-500/50 bg-emerald-500/10 shadow-sm shadow-emerald-500/10"
+                    : "border-slate-800 bg-slate-950/40 hover:border-slate-700"
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className={`p-1.5 rounded-lg ${activePickerColIndex === null ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-800 text-slate-400"}`}>
+                    <Compass className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-white truncate">Browse / Data Explore Mode</p>
+                    <p className="text-[9px] text-slate-400 truncate">Deselect columns & click page tabs/links</p>
+                  </div>
+                </div>
+                {activePickerColIndex === null && (
+                  <span className="text-[9px] font-extrabold uppercase text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-md border border-emerald-500/30 shrink-0">
+                    Active
+                  </span>
+                )}
+              </button>
             </div>
 
             {/* Columns List */}
@@ -1105,7 +1174,13 @@ export default function CustomCrawlerPage() {
                 return (
                   <div
                     key={idx}
-                    onClick={() => setActivePickerColIndex(idx)}
+                    onClick={() => {
+                      if (activePickerColIndex === idx) {
+                        setActivePickerColIndex(null); // Deselect if already active
+                      } else {
+                        setActivePickerColIndex(idx);
+                      }
+                    }}
                     className={`p-3 rounded-xl border transition-all cursor-pointer relative group flex flex-col gap-1.5 ${
                       isActive
                         ? "border-indigo-500 bg-indigo-500/10 shadow-sm shadow-indigo-500/10"
@@ -1117,10 +1192,18 @@ export default function CustomCrawlerPage() {
                         {col.name || `Column ${idx + 1}`}
                       </span>
                       {isActive ? (
-                        <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActivePickerColIndex(null);
+                          }}
+                          className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/20 hover:bg-indigo-500/30 px-2 py-0.5 rounded-md border border-indigo-500/30 transition-colors"
+                          title="Click to deselect (Switch to Browse mode)"
+                        >
                           <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping"></span>
-                          Target
-                        </span>
+                          Target ✕
+                        </button>
                       ) : hasOverride || (!hasMultipleDomains && col.selector) ? (
                         <span className="text-[9px] font-bold uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/15">
                           Mapped

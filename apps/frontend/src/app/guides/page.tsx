@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
@@ -598,6 +599,116 @@ export default function GuidesPage() {
               </button>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* 🌟 Dedicated Feature Guide Cards */}
+      <section className="space-y-6">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 text-xs font-semibold">
+            <Sparkles className="h-3.5 w-3.5" /> Feature User Manuals
+          </div>
+          <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+            Dedicated Feature Guides & Documentation
+          </h2>
+          <p className="text-slate-600 dark:text-slate-400 text-sm">
+            Select a feature below to view its complete step-by-step user guide with photos, input rules, and best practices.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Audit Center Guide Card */}
+          <Link
+            href="/guides/audit-center"
+            className="group rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 p-4 shadow-lg hover:shadow-xl hover:border-blue-500/50 transition-all flex flex-col justify-between space-y-4"
+          >
+            <div className="space-y-3">
+              <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-slate-950">
+                <Image
+                  src="/audit_center_preview.png"
+                  alt="Audit Center Guide"
+                  fill
+                  className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                />
+              </div>
+              <div className="space-y-1">
+                <span className="px-2.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase tracking-wider">
+                  Audit Center
+                </span>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  Audit Center User Guide
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Learn how to run Quick Scans and Sitemap XML audits, inspect typography computed styles, and export multi-sheet Excel reports.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center text-xs font-bold text-blue-600 dark:text-blue-400 gap-1 group-hover:translate-x-1 transition-transform pt-2 border-t border-slate-100 dark:border-slate-800/50">
+              Read Full Guide <ArrowRight className="h-3.5 w-3.5" />
+            </div>
+          </Link>
+
+          {/* Bulk Image Downloader Guide Card */}
+          <Link
+            href="/guides/image-downloader"
+            className="group rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 p-4 shadow-lg hover:shadow-xl hover:border-purple-500/50 transition-all flex flex-col justify-between space-y-4"
+          >
+            <div className="space-y-3">
+              <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-slate-950">
+                <Image
+                  src="/image_downloader_preview.png"
+                  alt="Bulk Image Downloader Guide"
+                  fill
+                  className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                />
+              </div>
+              <div className="space-y-1">
+                <span className="px-2.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 text-[10px] font-bold uppercase tracking-wider">
+                  Image Downloader
+                </span>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                  Bulk Image Downloader Guide
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Master bulk image scraping with CSS selector boundaries, natural dimension filtering, ZIP archives, and Excel cataloging.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center text-xs font-bold text-purple-600 dark:text-purple-400 gap-1 group-hover:translate-x-1 transition-transform pt-2 border-t border-slate-100 dark:border-slate-800/50">
+              Read Full Guide <ArrowRight className="h-3.5 w-3.5" />
+            </div>
+          </Link>
+
+          {/* Custom Crawling Guide Card */}
+          <Link
+            href="/guides/custom-crawling"
+            className="group rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/60 p-4 shadow-lg hover:shadow-xl hover:border-emerald-500/50 transition-all flex flex-col justify-between space-y-4"
+          >
+            <div className="space-y-3">
+              <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-slate-950">
+                <Image
+                  src="/custom_crawling_preview.png"
+                  alt="Custom Crawling Guide"
+                  fill
+                  className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                />
+              </div>
+              <div className="space-y-1">
+                <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
+                  Custom Crawling
+                </span>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                  Custom Crawling Guide
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Step-by-step instructions on setting up Excel templates (Row 1 headers, Row 2 CSS selectors) to extract custom data fields.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center text-xs font-bold text-emerald-600 dark:text-emerald-400 gap-1 group-hover:translate-x-1 transition-transform pt-2 border-t border-slate-100 dark:border-slate-800/50">
+              Read Full Guide <ArrowRight className="h-3.5 w-3.5" />
+            </div>
+          </Link>
         </div>
       </section>
 

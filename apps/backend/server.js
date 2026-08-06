@@ -1196,19 +1196,75 @@ app.get('/api/custom-crawler/preview', async (req, res) => {
             }
         }
 
-        // Add <base> tag so all relative paths resolve against the original origin
-        const baseTag = `<base href="${baseOrigin}/">\n<meta name="referrer" content="no-referrer" />`;
+        // Helper to unwrap Next.js _next/image optimization URLs
+        function unwrapNextImage(u) {
+            if (!u) return u;
+            try {
+                if (u.includes('_next/image') && u.includes('url=')) {
+                    const searchStr = u.includes('?') ? u.split('?')[1] : u;
+                    const params = new URLSearchParams(searchStr);
+                    const realUrl = params.get('url');
+                    if (realUrl) return realUrl;
+                }
+            } catch (e) {}
+            return u;
+        }
+
+        // Helper to convert any relative URL to full absolute URL based on target page URL
+        function toAbsoluteUrl(u) {
+            if (!u || typeof u !== 'string') return u;
+            u = u.trim();
+            if (!u || u.startsWith('data:') || u.startsWith('blob:') || u.startsWith('javascript:')) return u;
+            
+            const cleaned = unwrapNextImage(u);
+            try {
+                return new URL(cleaned, targetUrl.href).href;
+            } catch (e) {
+                return cleaned;
+            }
+        }
+
+        // Strip pre-existing <base> tags to avoid conflicts
+        html = html.replace(/<base[^>]*>/gi, '');
+
+        // Add <base> tag so all relative paths resolve against target page URL / origin
+        const baseHref = targetUrl.href;
+        const baseTag = `<base href="${baseHref}">\n<meta name="referrer" content="no-referrer" />`;
         if (/<head[^>]*>/i.test(html)) {
-            html = html.replace(/<head[^>]*>/i, (m) => m + baseTag);
+            html = html.replace(/<head[^>]*>/i, (m) => m + '\n' + baseTag);
         } else {
             html = baseTag + html;
         }
 
-        // Fix lazy loaded images and broken srcsets
+        // Fix lazy loaded images and normalize data attributes
         html = html.replace(/loading=["']?lazy["']?/gi, '');
-        html = html.replace(/srcset=["'][^"']*["']/gi, '');
         html = html.replace(/data-lazy-src=/gi, 'src=');
         html = html.replace(/data-src=/gi, 'src=');
+        html = html.replace(/data-original=/gi, 'src=');
+        html = html.replace(/data-srcset=/gi, 'srcset=');
+
+        // Rewrite all src, data-src attributes on img, source, link elements to absolute URLs
+        html = html.replace(/(src|data-src|data-lazy-src|data-original)=["']([^"']+)["']/gi, (match, attr, val) => {
+            return `${attr}="${toAbsoluteUrl(val)}"`;
+        });
+
+        // Rewrite srcset / data-srcset attributes to absolute URLs
+        html = html.replace(/(srcset|data-srcset)=["']([^"']+)["']/gi, (match, attr, val) => {
+            const parts = val.split(',').map(part => {
+                const trimmed = part.trim().split(/\s+/);
+                if (trimmed[0]) {
+                    trimmed[0] = toAbsoluteUrl(trimmed[0]);
+                }
+                return trimmed.join(' ');
+            });
+            return `${attr}="${parts.join(', ')}"`;
+        });
+
+        // Rewrite inline background-image: url(...) styles to absolute URLs
+        html = html.replace(/url\((['"]?)([^'")]+)\1\)/gi, (match, quote, val) => {
+            if (val.startsWith('data:') || val.startsWith('blob:')) return match;
+            return `url(${quote}${toAbsoluteUrl(val)}${quote})`;
+        });
 
         // Build the injected click-capture + highlight script
         const injectScript = `
@@ -1220,9 +1276,25 @@ app.get('/api/custom-crawler/preview', async (req, res) => {
 </style>
 <script>
 (function(){
-  // Prevent navigation away from proxy page
-  document.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); }, true);
-  document.addEventListener('submit', function(e){ e.preventDefault(); }, true);
+  var pickingActive = true;
+
+  window.addEventListener('message', function(e){
+    if (e.data && e.data.type === 'SET_PICKER_MODE') {
+      pickingActive = !!e.data.active;
+      var tip = document.querySelector('#__audit_bar__ .tip');
+      var selSpan = document.getElementById('__audit_sel__');
+      var hlEl = document.getElementById('__audit_hl__');
+      if (!pickingActive) {
+        if (hlEl) hlEl.style.display = 'none';
+        if (tip) tip.innerHTML = '🔍 Browse / Data Explore Mode Active — Click links & tabs to explore';
+        if (selSpan) selSpan.textContent = '';
+      } else {
+        if (tip) tip.innerHTML = '🎯 Click any element to pick its selector';
+      }
+    }
+  });
+
+  document.addEventListener('submit', function(e){ if (pickingActive) e.preventDefault(); }, true);
 
   var hl = document.createElement('div');
   hl.id = '__audit_hl__';
@@ -1268,6 +1340,7 @@ app.get('/api/custom-crawler/preview', async (req, res) => {
   }
 
   document.addEventListener('mouseover', function(e){
+    if (!pickingActive) return;
     var r=e.target.getBoundingClientRect();
     hl.style.top=(r.top+window.scrollY)+'px';
     hl.style.left=(r.left+window.scrollX)+'px';
@@ -1280,6 +1353,9 @@ app.get('/api/custom-crawler/preview', async (req, res) => {
   }, true);
 
   document.addEventListener('click', function(e){
+    if (!pickingActive) {
+      return; // Browse mode: allow natural clicks on page elements/tabs
+    }
     e.preventDefault(); e.stopPropagation();
     var el=e.target;
     var sel=getSelector(el);
