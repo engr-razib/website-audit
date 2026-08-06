@@ -139,6 +139,16 @@ export interface BrowserlessKeyStatus {
 
 const BROWSERLESS_STORAGE_KEY = 'browserless_api_key';
 
+// Feature flag — set NEXT_PUBLIC_BROWSERLESS_ENABLED=false in local .env to fully
+// disable Browserless key syncing and the API key status badge in the navbar.
+export const BROWSERLESS_ENABLED = process.env.NEXT_PUBLIC_BROWSERLESS_ENABLED === 'true';
+
+// In local development (Browserless disabled), auto-clear any stale API key from
+// localStorage that may have been saved in a previous production-like session.
+if (!BROWSERLESS_ENABLED && typeof window !== 'undefined') {
+  try { localStorage.removeItem(BROWSERLESS_STORAGE_KEY); } catch { /* ignore */ }
+}
+
 export function getStoredBrowserlessKey(): string | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -212,6 +222,11 @@ export async function getBrowserlessKeyStatus(): Promise<BrowserlessKeyStatus> {
 }
 
 export async function syncBrowserlessKeyWithBackend(): Promise<BrowserlessKeyStatus> {
+  // In local development (NEXT_PUBLIC_BROWSERLESS_ENABLED !== 'true'),
+  // skip syncing any stored key so the backend stays key-free and uses local Playwright.
+  if (!BROWSERLESS_ENABLED) {
+    return { configured: false, maskedKey: null };
+  }
   const storedKey = getStoredBrowserlessKey();
   if (storedKey) {
     try {

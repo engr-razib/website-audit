@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Server, Sparkles, Activity, Globe, Key, Home, LayoutDashboard, BookOpen, FileText, Sun, Moon, Image as ImageIcon, ChevronDown, Mail, Menu, X, Database } from "lucide-react";
-import { checkBackendHealth, API_BASE, checkBrowserlessConnection, getBrowserlessKeyStatus, syncBrowserlessKeyWithBackend } from "@/lib/api";
+import { checkBackendHealth, API_BASE, checkBrowserlessConnection, getBrowserlessKeyStatus, syncBrowserlessKeyWithBackend, BROWSERLESS_ENABLED } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "./ui/badge";
 import { BrowserlessKeyModal } from "./BrowserlessKeyModal";
@@ -106,8 +106,10 @@ export function Navbar() {
     };
   }, []);
 
-  // Load key configured status in background once backend is online
+  // Load key configured status in background once backend is online.
+  // Skipped entirely when BROWSERLESS_ENABLED=false (local development).
   useEffect(() => {
+    if (!BROWSERLESS_ENABLED) return; // local dev — no key needed
     let isMounted = true;
     if (status === "online") {
       const timer = setTimeout(() => {
@@ -227,7 +229,8 @@ export function Navbar() {
 
             {/* Right section: Links (Case Study, Guides), API Key Config, Template Switcher */}
             <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
-              {status === "online" && (
+              {/* API Key button — only shown when Browserless is enabled (production) */}
+              {BROWSERLESS_ENABLED && status === "online" && (
                 <button
                   onClick={handleOpenKeyModal}
                   className={`flex items-center gap-1 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer ${
@@ -273,8 +276,8 @@ export function Navbar() {
 
              
 
-              {/* API Key Connection badge */}
-              {status === "online" && (
+              {/* API Key Connection badge — only shown when Browserless is enabled (production) */}
+              {BROWSERLESS_ENABLED && status === "online" && (
                 <div className="flex items-center">
                   {testStatus === "testing" && (
                     <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
@@ -517,13 +520,15 @@ export function Navbar() {
         )}
       </AnimatePresence>
 
-      {/* Browserless API Key Modal */}
-      <BrowserlessKeyModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onKeySaved={handleKeySaved}
-        showInvalidWarning={showInvalidWarning}
-      />
+      {/* Browserless API Key Modal — only rendered when Browserless is enabled (production) */}
+      {BROWSERLESS_ENABLED && (
+        <BrowserlessKeyModal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onKeySaved={handleKeySaved}
+          showInvalidWarning={showInvalidWarning}
+        />
+      )}
     </>
   );
 }

@@ -16,7 +16,10 @@ setInterval(() => {
 }, 6 * 60 * 60 * 1000).unref();
 
 // Mutable runtime API key — can be updated via POST /api/settings/browserless-key
-let BROWSERLESS_API_KEY = process.env.BROWSERLESS_API_KEY || '2UyXC7OcLU2mwm77ae4b055adfcec31aa0333d1979976e9cb';
+// NOTE: No hardcoded fallback key — in local development, leave BROWSERLESS_API_KEY unset
+// so local Playwright Chromium is used instead of calling Browserless.io.
+// Only set BROWSERLESS_API_KEY in your production environment.
+let BROWSERLESS_API_KEY = process.env.BROWSERLESS_API_KEY || '';
 
 
 const app = express();
