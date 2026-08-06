@@ -1154,25 +1154,53 @@ app.get('/api/custom-crawler/preview', async (req, res) => {
         const targetUrl = new URL(url);
         const baseOrigin = targetUrl.origin;
 
-        const response = await axios.get(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
-            },
-            timeout: 15000,
-            responseType: 'text',
-        });
-
-        let html = response.data;
+        let html = '';
+        try {
+            const response = await axios.get(url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                },
+                timeout: 15000,
+                responseType: 'text',
+            });
+            html = response.data;
+        } catch (err) {
+            console.log(`[!] Axios failed to fetch preview for ${url} (Status: ${err.response?.status}). Falling back to Playwright...`);
+            let browser;
+            try {
+                if (global.BROWSERLESS_API_KEY) {
+                    browser = await chromium.connectOverCDP(`wss://chrome.browserless.io?token=${global.BROWSERLESS_API_KEY}`);
+                } else {
+                    browser = await chromium.launch({ headless: true });
+                }
+                const page = await browser.newPage({ 
+                    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' 
+                });
+                await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                html = await page.content();
+            } catch (pwErr) {
+                console.error(`[!] Playwright fallback failed for preview:`, pwErr.message);
+                throw pwErr;
+            } finally {
+                if (browser) await browser.close();
+            }
+        }
 
         // Add <base> tag so all relative paths resolve against the original origin
-        const baseTag = `<base href="${baseOrigin}/">`;
+        const baseTag = `<base href="${baseOrigin}/">\n<meta name="referrer" content="no-referrer" />`;
         if (/<head[^>]*>/i.test(html)) {
             html = html.replace(/<head[^>]*>/i, (m) => m + baseTag);
         } else {
             html = baseTag + html;
         }
+
+        // Fix lazy loaded images and broken srcsets
+        html = html.replace(/loading=["']?lazy["']?/gi, '');
+        html = html.replace(/srcset=["'][^"']*["']/gi, '');
+        html = html.replace(/data-lazy-src=/gi, 'src=');
+        html = html.replace(/data-src=/gi, 'src=');
 
         // Build the injected click-capture + highlight script
         const injectScript = `

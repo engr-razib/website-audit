@@ -96,6 +96,9 @@ async function getRobotsRules(domainUrl) {
  * Checks if a specific URL is allowed for crawling
  */
 async function isUrlAllowed(url, botUserAgent = 'auditbot') {
+    if (process.env.NEXT_PUBLIC_DISCLAIMER_ENABLED === 'false') {
+        return true;
+    }
     try {
         const parsedUrl = new URL(url);
         const rules = await getRobotsRules(url);
