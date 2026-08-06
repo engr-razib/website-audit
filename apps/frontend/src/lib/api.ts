@@ -356,6 +356,15 @@ export interface CustomCrawlRequest {
   containerSelector?: string;
   mappings: Record<string, CustomCrawlMapping>;
   xlsxBase64?: string;
+  existingData?: Record<string, any>[];
+}
+
+export interface ParsedExcelPackage {
+  headers: string[];
+  existingData?: Record<string, any>[];
+  mappings?: Record<string, CustomCrawlMapping> | null;
+  savedUrls?: string[] | null;
+  hasConfigSheet?: boolean;
 }
 
 export interface CustomCrawlJobStatus {
@@ -378,7 +387,7 @@ export interface CustomCrawlJobStatus {
   error?: string | null;
 }
 
-export async function parseExcelHeaders(fileBase64: string): Promise<{ headers: string[] }> {
+export async function parseExcelHeaders(fileBase64: string): Promise<ParsedExcelPackage> {
   try {
     const res = await fetch(`${API_BASE}/custom-crawler/parse-headers`, {
       method: 'POST',
@@ -434,6 +443,10 @@ export function getCustomCrawlExcelDownloadUrl(jobId: string): string {
 
 export function getCustomCrawlZipDownloadUrl(jobId: string): string {
   return `${API_BASE}/custom-crawler/jobs/${jobId}/download/zip`;
+}
+
+export function getCustomCrawlSampleTemplateUrl(): string {
+  return `${API_BASE}/custom-crawler/download-sample-template`;
 }
 
 

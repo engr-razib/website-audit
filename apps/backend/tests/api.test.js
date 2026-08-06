@@ -111,7 +111,7 @@ test('Backend REST API Tests', async (t) => {
     assert.ok(res.body.message);
   });
 
-  await t.test('GET /api/settings/browserless-key/status returns default key status', async () => {
+  await t.test('GET /api/settings/browserless-key/status returns key status', async () => {
     const res = await request({
       hostname: 'localhost',
       port: PORT,
@@ -120,8 +120,14 @@ test('Backend REST API Tests', async (t) => {
     });
 
     assert.equal(res.statusCode, 200);
-    assert.equal(res.body.configured, true);
-    assert.equal(res.body.maskedKey, '2UyXC7••••••••e9cb');
+    if (process.env.NODE_ENV === 'production') {
+      assert.equal(res.body.configured, true);
+      assert.equal(res.body.maskedKey, '2UyXC7••••••••e9cb');
+    } else {
+      assert.equal(res.body.configured, false);
+      assert.equal(res.body.maskedKey, null);
+    }
   });
+
 });
 

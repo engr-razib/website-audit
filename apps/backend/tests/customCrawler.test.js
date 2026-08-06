@@ -126,4 +126,77 @@ test('Backend Custom Crawler REST API Tests', async (t) => {
     assert.equal(res.statusCode, 404);
     assert.equal(res.body.error, 'Crawl job not found');
   });
+
+  await t.test('POST /api/custom-crawler/parse-headers restores embedded _CRAWL_CONFIG_ rules and existing data', async () => {
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('Crawled Data');
+    ws.addRow(['Item', 'Price']);
+    ws.addRow(['Widget A', '$10.00']);
+    ws.addRow(['Widget B', '$20.00']);
+
+    const configWs = workbook.addWorksheet('_CRAWL_CONFIG_');
+    configWs.addRow(['Column Name', 'CSS Selector', 'Extract Type', 'Attribute Name', 'Domain Overrides']);
+    configWs.addRow(['Item', '.item-title', 'text', '', '']);
+    configWs.addRow(['Price', '.item-price', 'text', '', JSON.stringify({ 'myshopify.com': '.price-val' })]);
+    configWs.addRow(['__URLS__', JSON.stringify(['https://shop.example.com']), 'urls', '', '']);
+
+    const buf = await workbook.xlsx.writeBuffer();
+    const b64 = buf.toString('base64');
+
+    const res = await request({
+      hostname: 'localhost',
+      port: PORT,
+      path: '/api/custom-crawler/parse-headers',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    }, { fileBase64: b64 });
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.body.headers, ['Item', 'Price']);
+    assert.equal(res.body.hasConfigSheet, true);
+    assert.equal(res.body.existingData.length, 2);
+    assert.equal(res.body.existingData[0].Item, 'Widget A');
+    assert.equal(res.body.mappings.Item.selector, '.item-title');
+    assert.equal(res.body.mappings.Price.domainOverrides['myshopify.com'], '.price-val');
+    assert.deepEqual(res.body.savedUrls, ['https://shop.example.com']);
+  });
+
+  await t.test('POST /api/custom-crawler/parse-headers extracts Row 1 as headers and Row 2 as selectors', async () => {
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet('Template');
+    ws.addRow(['Product Name', 'Price Tag', 'Photo']);
+    ws.addRow(['h1.title', 'span.amount', 'img.src']);
+    ws.addRow(['Laptop', '$999', 'https://example.com/pic.png']);
+
+    const buf = await workbook.xlsx.writeBuffer();
+    const b64 = buf.toString('base64');
+
+    const res = await request({
+      hostname: 'localhost',
+      port: PORT,
+      path: '/api/custom-crawler/parse-headers',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    }, { fileBase64: b64 });
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.body.headers, ['Product Name', 'Price Tag', 'Photo']);
+    assert.equal(res.body.mappings['Product Name'].selector, 'h1.title');
+    assert.equal(res.body.mappings['Price Tag'].selector, 'span.amount');
+    assert.equal(res.body.mappings['Photo'].selector, 'img.src');
+    assert.equal(res.body.existingData.length, 1);
+    assert.equal(res.body.existingData[0]['Product Name'], 'Laptop');
+  });
+
+  await t.test('GET /api/custom-crawler/download-sample-template generates valid Excel binary', async () => {
+    const res = await request({
+      hostname: 'localhost',
+      port: PORT,
+      path: '/api/custom-crawler/download-sample-template',
+      method: 'GET'
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.ok(res.headers['content-type'].includes('spreadsheetml'));
+  });
 });

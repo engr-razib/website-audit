@@ -22,13 +22,16 @@ import {
   Crosshair,
   X as XIcon,
   Plus,
-  Trash2
+  Trash2,
+  Upload
 } from "lucide-react";
 import {
+  parseExcelHeaders,
   startCustomCrawlJob,
   getCustomCrawlJobStatus,
   getCustomCrawlExcelDownloadUrl,
   getCustomCrawlZipDownloadUrl,
+  getCustomCrawlSampleTemplateUrl,
   CustomCrawlMapping,
   CustomCrawlJobStatus,
   API_BASE
@@ -59,7 +62,90 @@ export default function CustomCrawlerPage() {
   const [activePickerColIndex, setActivePickerColIndex] = useState<number | null>(null);
   const [previewUrlIndex, setPreviewUrlIndex] = useState(0);
 
+  // Uploaded XLSX & Data Appending State
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [uploadedDataset, setUploadedDataset] = useState<Record<string, any>[] | null>(null);
+  const [isParsingExcel, setIsParsingExcel] = useState(false);
+  const [invalidColumnIndices, setInvalidColumnIndices] = useState<number[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      setError("Please upload a valid Excel file (.xlsx)");
+      return;
+    }
+
+    setIsParsingExcel(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      const len = bytes.byteLength;
+      const chunk = 8192;
+      for (let i = 0; i < len; i += chunk) {
+        const slice = bytes.subarray(i, Math.min(i + chunk, len));
+        binary += String.fromCharCode.apply(null, Array.from(slice));
+      }
+      const base64 = btoa(binary);
+
+      const parsedPkg = await parseExcelHeaders(base64);
+      setUploadedFileName(file.name);
+
+      if (parsedPkg.existingData && parsedPkg.existingData.length > 0) {
+        setUploadedDataset(parsedPkg.existingData);
+      } else {
+        setUploadedDataset(null);
+      }
+
+      // Extract 1st row as columns list and map related rules from XLSX file
+      if (parsedPkg.headers && parsedPkg.headers.length > 0) {
+        const cleanHeaders = parsedPkg.headers.filter(h => h !== "Page URL" && !h.endsWith("(Local Path)"));
+        
+        const newCols = cleanHeaders.map(headerName => {
+          const rule = parsedPkg.mappings?.[headerName];
+          const isImg = headerName.toLowerCase().includes("image") || headerName.toLowerCase().includes("photo");
+          
+          return {
+            name: headerName,
+            selector: rule?.selector || "",
+            type: (rule?.type || (isImg ? "attr" : "text")) as "text" | "attr",
+            attrName: rule?.attrName || (isImg ? "src" : undefined),
+            domainOverrides: rule?.domainOverrides
+          };
+        });
+
+        if (newCols.length > 0) {
+          setColumns(newCols);
+        }
+
+        if (parsedPkg.savedUrls && parsedPkg.savedUrls.length > 0) {
+          setUrlsText(parsedPkg.savedUrls.join("\n"));
+        }
+
+        const dataMsg = parsedPkg.existingData && parsedPkg.existingData.length > 0 
+          ? ` plus ${parsedPkg.existingData.length} existing dataset rows ready to append!` 
+          : ".";
+        
+        const rulesCount = newCols.filter(c => c.selector).length;
+        const rulesMsg = rulesCount > 0 ? ` and restored ${rulesCount} selector rules` : "";
+
+        setSuccess(`Uploaded "${file.name}": Extracted ${newCols.length} columns from 1st row${rulesMsg}${dataMsg}`);
+      }
+    } catch (err: any) {
+      setError(`Failed to parse uploaded Excel file: ${err.message}`);
+    } finally {
+      setIsParsingExcel(false);
+      if (e.target) e.target.value = "";
+    }
+  };
 
   // Dispatch active status to topbar connections
   useEffect(() => {
@@ -196,6 +282,9 @@ export default function CustomCrawlerPage() {
   // Update specific column configuration values
   const handleUpdateColumn = (index: number, field: string, value: any) => {
     setColumns(prev => prev.map((col, i) => i === index ? { ...col, [field]: value } : col));
+    if (invalidColumnIndices.includes(index)) {
+      setInvalidColumnIndices(prev => prev.filter(i => i !== index));
+    }
   };
 
   // Poll Job Status
@@ -239,11 +328,21 @@ export default function CustomCrawlerPage() {
       setError("Please define at least one column to extract.");
       return;
     }
-    const incomplete = columns.some(col => !col.name.trim() || !col.selector.trim());
-    if (incomplete) {
-      setError("Please ensure all columns have a name and a CSS selector.");
+
+    // Check for invalid columns (empty column name or empty selector)
+    const invalidIndices: number[] = [];
+    columns.forEach((col, idx) => {
+      if (!col.name.trim() || !col.selector.trim()) {
+        invalidIndices.push(idx);
+      }
+    });
+
+    if (invalidIndices.length > 0) {
+      setInvalidColumnIndices(invalidIndices);
+      setError(`Please ensure all columns have both a Column Name and a CSS selector. Invalid columns are highlighted in red below.`);
       return;
     }
+    setInvalidColumnIndices([]);
 
     setStartingCrawl(true);
     setError(null);
@@ -267,6 +366,7 @@ export default function CustomCrawlerPage() {
         crawlOption,
         maxPages: 1, // Crawl only the exact given URLs
         mappings,
+        existingData: uploadedDataset || undefined
       });
 
       setActiveJobId(res.jobId);
@@ -287,6 +387,8 @@ export default function CustomCrawlerPage() {
     setJobStatus(null);
     setError(null);
     setSuccess(null);
+    setUploadedFileName(null);
+    setUploadedDataset(null);
   };
 
   return (
@@ -370,6 +472,78 @@ export default function CustomCrawlerPage() {
                 <Settings className="h-4 w-4 text-blue-500" />
                 Crawl Configuration
               </h3>
+
+              {/* Excel Template & Data Upload Box */}
+              <div className="space-y-2 p-3.5 rounded-xl border border-dashed border-blue-500/30 bg-blue-50/30 dark:bg-blue-950/20">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <FileSpreadsheet className="h-4 w-4 text-emerald-500" />
+                    Upload Excel (.xlsx)
+                  </label>
+                  {uploadedFileName && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUploadedFileName(null);
+                        setUploadedDataset(null);
+                      }}
+                      className="text-[10px] font-semibold text-red-500 hover:underline flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <XIcon className="h-3 w-3" /> Clear
+                    </button>
+                  )}
+                </div>
+                
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx, .xls"
+                  onChange={handleExcelUpload}
+                  className="hidden"
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={isParsingExcel}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full py-2 px-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-850 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm truncate"
+                  >
+                    {isParsingExcel ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+                        <span>Parsing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        <span className="truncate">{uploadedFileName ? `Loaded: ${uploadedFileName}` : "Upload XLSX"}</span>
+                      </>
+                    )}
+                  </button>
+
+                  <a
+                    href={getCustomCrawlSampleTemplateUrl()}
+                    download="sample_custom_crawl_template.xlsx"
+                    className="w-full py-2 px-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-semibold text-emerald-700 dark:text-emerald-400 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm truncate"
+                    title="Download sample XLSX file with Crawled Data, Crawl Rules, and Demo URLs"
+                  >
+                    <Download className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span className="truncate">Sample Template</span>
+                  </a>
+                </div>
+
+                {uploadedDataset && (
+                  <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1 bg-emerald-500/10 px-2.5 py-1 rounded-md">
+                    <span>📌</span>
+                    <span>{uploadedDataset.length} existing row(s) loaded. Next crawl results will append!</span>
+                  </div>
+                )}
+                
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  Upload an XLSX file to auto-populate column selector rules and append new crawl data.
+                </p>
+              </div>
 
               {/* Multi-URL Textarea */}
               <div className="space-y-1.5">
@@ -545,20 +719,35 @@ export default function CustomCrawlerPage() {
                     </p>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-1">
-                      {columns.map((col, idx) => (
+                      {columns.map((col, idx) => {
+                        const isInvalid = invalidColumnIndices.includes(idx) || (error !== null && (!col.name.trim() || !col.selector.trim()));
+                        return (
                         <div
                           key={idx}
-                          className="p-4 rounded-xl border border-slate-100 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950/20 hover:border-slate-200 dark:hover:border-slate-800 transition-colors space-y-3 relative group"
+                          className={`p-4 rounded-xl border transition-all space-y-3 relative group ${
+                            isInvalid
+                              ? "border-red-500/80 bg-red-500/5 ring-2 ring-red-500/30 shadow-md shadow-red-500/10 dark:border-red-500 dark:bg-red-950/20"
+                              : "border-slate-100 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950/20 hover:border-slate-200 dark:hover:border-slate-800"
+                          }`}
                         >
                           <div className="flex justify-between items-center">
-                            {/* Editable Column Name */}
-                            <input
-                              type="text"
-                              value={col.name}
-                              onChange={(e) => handleUpdateColumn(idx, "name", e.target.value)}
-                              className="text-xs font-bold text-slate-900 dark:text-white bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none w-[160px]"
-                              placeholder="Column Name"
-                            />
+                            <div className="flex items-center gap-1.5">
+                              {/* Editable Column Name */}
+                              <input
+                                type="text"
+                                value={col.name}
+                                onChange={(e) => handleUpdateColumn(idx, "name", e.target.value)}
+                                className={`text-xs font-bold bg-transparent border-b hover:border-slate-300 focus:border-blue-500 focus:outline-none w-[150px] ${
+                                  !col.name.trim() ? "border-red-400 text-red-500 placeholder-red-400 font-bold" : "text-slate-900 dark:text-white border-transparent"
+                                }`}
+                                placeholder="Column Name (Required)"
+                              />
+                              {isInvalid && (
+                                <span className="text-[9px] font-bold text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20 shrink-0">
+                                  ⚠️ Incomplete
+                                </span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-1">
                               {/* Individual visual picker shortcut */}
                               {getParsedUrls().length > 0 && (
@@ -650,7 +839,8 @@ export default function CustomCrawlerPage() {
                             )}
                           </div>
                         </div>
-                      ))}
+                      );
+                      })}
                     </div>
                   </div>
                 )}

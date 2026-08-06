@@ -53,9 +53,120 @@ function getSafeImageFilename(url, contentType, index) {
 }
 
 /**
+ * Appends a visible "Crawl Rules" sheet and hidden "_CRAWL_CONFIG_" sheet to the Excel workbook storing column rules, selectors, and URLs.
+ */
+function appendCrawlConfigSheet(workbook, mappings, urls) {
+    try {
+        // 1. Remove existing config sheets if present
+        ['_CRAWL_CONFIG_', 'Crawl Rules'].forEach(sheetName => {
+            const existing = workbook.getWorksheet(sheetName);
+            if (existing) {
+                try { workbook.removeWorksheet(existing.id); } catch(e) {}
+            }
+        });
+
+        // 2. Add visible "Crawl Rules" worksheet for human viewing & re-importing
+        const rulesSheet = workbook.addWorksheet('Crawl Rules');
+        rulesSheet.views = [{ showGridLines: true }];
+        
+        const headerStyle = {
+            fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F497D' } },
+            font: { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FFFFFFFF' } },
+            alignment: { horizontal: 'center', vertical: 'middle', wrapText: true }
+        };
+
+        const titleRow = rulesSheet.addRow(['Crawler Feature Rules & Selector Configuration', '', '', '', '']);
+        titleRow.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: 'FF1F497D' } };
+        rulesSheet.addRow([]);
+
+        const hRow = rulesSheet.addRow(['Column Name', 'CSS Selector', 'Extract Type', 'Attribute Name', 'Domain Overrides']);
+        hRow.height = 26;
+        hRow.eachCell(cell => Object.assign(cell, headerStyle));
+
+        if (mappings && typeof mappings === 'object') {
+            Object.keys(mappings).forEach((colName, idx) => {
+                const m = mappings[colName] || {};
+                const row = rulesSheet.addRow([
+                    colName,
+                    m.selector || '',
+                    m.type || 'text',
+                    m.attrName || '',
+                    m.domainOverrides ? JSON.stringify(m.domainOverrides) : ''
+                ]);
+                row.height = 22;
+                row.eachCell((cell, cIdx) => {
+                    cell.font = { name: 'Segoe UI', size: 10 };
+                    cell.alignment = { horizontal: cIdx === 1 || cIdx === 2 ? 'left' : 'center', vertical: 'middle' };
+                });
+            });
+        }
+
+        if (urls && Array.isArray(urls) && urls.length > 0) {
+            rulesSheet.addRow([]);
+            const urlTitleRow = rulesSheet.addRow(['Starting URLs List', '', '', '', '']);
+            urlTitleRow.font = { name: 'Segoe UI', size: 12, bold: true, color: { argb: 'FF1F497D' } };
+            urls.forEach(u => {
+                const uRow = rulesSheet.addRow([u]);
+                uRow.getCell(1).font = { name: 'Segoe UI', size: 10, color: { argb: 'FF2563EB' } };
+            });
+        }
+
+        // Auto column widths for rulesSheet
+        rulesSheet.columns.forEach((col, idx) => {
+            col.width = idx === 0 ? 25 : idx === 1 ? 40 : idx === 4 ? 35 : 20;
+        });
+
+        // 3. Also add hidden _CRAWL_CONFIG_ for backward compatibility
+        const configSheet = workbook.addWorksheet('_CRAWL_CONFIG_');
+        configSheet.state = 'hidden';
+        const cfgHRow = configSheet.addRow(['Column Name', 'CSS Selector', 'Extract Type', 'Attribute Name', 'Domain Overrides']);
+        cfgHRow.font = { bold: true };
+
+        if (mappings && typeof mappings === 'object') {
+            Object.keys(mappings).forEach(colName => {
+                const m = mappings[colName] || {};
+                configSheet.addRow([
+                    colName,
+                    m.selector || '',
+                    m.type || 'text',
+                    m.attrName || '',
+                    m.domainOverrides ? JSON.stringify(m.domainOverrides) : ''
+                ]);
+            });
+        }
+
+        if (urls && Array.isArray(urls) && urls.length > 0) {
+            configSheet.addRow(['__URLS__', JSON.stringify(urls), 'urls', '', '']);
+        }
+    } catch (e) {
+        console.warn('[!] Failed to write Crawl Rules sheet:', e.message);
+    }
+}
+
+/**
+ * Helper to test if a string resembles a CSS selector
+ */
+function isCssSelectorLike(val) {
+    if (!val || typeof val !== 'string') return false;
+    const s = val.trim();
+    if (!s) return false;
+    return /^[.#\[]/.test(s) || 
+           /\b(h1|h2|h3|h4|h5|h6|p|span|div|a|img|button|li|ul|ol|table|td|th|section|article|header|footer|nav|main|aside|form|input|textarea|select|option|svg|path|code|pre|body)\b/i.test(s) ||
+           s.includes('>') || s.includes('::') || s.includes(':') || s.includes('[');
+}
+
+/**
  * Parses the first row of the provided Excel sheet buffer to return headers
  */
 async function parseExcelHeaders(fileBuffer) {
+    const pkg = await parseExcelPackage(fileBuffer);
+    return pkg.headers;
+}
+
+/**
+ * Complete Excel package parser: extracts headers, existing data rows, and embedded rules settings.
+ */
+async function parseExcelPackage(fileBuffer) {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(fileBuffer);
     const worksheet = workbook.worksheets[0];
@@ -66,7 +177,6 @@ async function parseExcelHeaders(fileBuffer) {
     const headers = [];
     const firstRow = worksheet.getRow(1);
     
-    // Read headers up to columnCount to preserve order
     for (let i = 1; i <= worksheet.columnCount; i++) {
         const val = firstRow.getCell(i).value;
         if (val !== undefined && val !== null) {
@@ -77,7 +187,125 @@ async function parseExcelHeaders(fileBuffer) {
     if (headers.length === 0) {
         throw new Error('No headers found in the first row of the Excel template.');
     }
-    return headers;
+
+    // Parse rules worksheet if present ('Crawl Rules' or '_CRAWL_CONFIG_')
+    let mappings = null;
+    let savedUrls = null;
+    let hasConfigSheet = false;
+    const configSheet = workbook.getWorksheet('Crawl Rules') || workbook.getWorksheet('_CRAWL_CONFIG_');
+
+    if (configSheet) {
+        hasConfigSheet = true;
+        mappings = {};
+        let inUrlSection = false;
+        const tempUrls = [];
+
+        for (let r = 1; r <= configSheet.rowCount; r++) {
+            const row = configSheet.getRow(r);
+            const col1 = row.getCell(1).value ? row.getCell(1).value.toString().trim() : '';
+            if (!col1) continue;
+
+            if (col1 === 'Starting URLs List' || col1 === 'Starting URLs') {
+                inUrlSection = true;
+                continue;
+            }
+
+            if (inUrlSection) {
+                if (col1.startsWith('http')) {
+                    tempUrls.push(col1);
+                }
+                continue;
+            }
+
+            if (col1 === '__URLS__') {
+                const urlsVal = row.getCell(2).value ? row.getCell(2).value.toString() : '';
+                try { savedUrls = JSON.parse(urlsVal); } catch { savedUrls = urlsVal.split('\n').filter(Boolean); }
+                continue;
+            }
+
+            if (col1 === 'Column Name' || col1.includes('Crawler Feature Rules')) continue;
+
+            const selector = row.getCell(2).value ? row.getCell(2).value.toString().trim() : '';
+            const type = row.getCell(3).value ? row.getCell(3).value.toString().trim() : 'text';
+            const attrName = row.getCell(4).value ? row.getCell(4).value.toString().trim() : undefined;
+            const domainOverridesRaw = row.getCell(5).value ? row.getCell(5).value.toString() : '';
+            let domainOverrides = undefined;
+            if (domainOverridesRaw) {
+                try { domainOverrides = JSON.parse(domainOverridesRaw); } catch (e) {}
+            }
+
+            mappings[col1] = {
+                selector,
+                type: type === 'attr' ? 'attr' : 'text',
+                attrName: attrName || undefined,
+                domainOverrides: domainOverrides || undefined
+            };
+        }
+
+        if (!savedUrls && tempUrls.length > 0) {
+            savedUrls = tempUrls;
+        }
+    }
+
+    // Check if Row 2 of worksheet contains selector rules if no config sheet was found
+    let dataStartRow = 2;
+    if (!hasConfigSheet && worksheet.rowCount >= 2) {
+        const secondRow = worksheet.getRow(2);
+        let secondRowSelectorMatches = 0;
+
+        headers.forEach((h, colIdx) => {
+            const cellVal = secondRow.getCell(colIdx + 1).value;
+            if (cellVal && isCssSelectorLike(cellVal.toString())) {
+                secondRowSelectorMatches++;
+            }
+        });
+
+        // If at least one cell in row 2 looks like a CSS selector, parse row 2 as rules!
+        if (secondRowSelectorMatches > 0) {
+            mappings = {};
+            dataStartRow = 3; // Data starts from row 3
+            headers.forEach((h, colIdx) => {
+                const cellVal = secondRow.getCell(colIdx + 1).value ? secondRow.getCell(colIdx + 1).value.toString().trim() : '';
+                const isImg = h.toLowerCase().includes('image') || h.toLowerCase().includes('photo') || cellVal.includes('src');
+                mappings[h] = {
+                    selector: cellVal,
+                    type: isImg ? 'attr' : 'text',
+                    attrName: isImg ? 'src' : undefined
+                };
+            });
+            hasConfigSheet = true;
+        }
+    }
+
+    // Extract existing data rows
+    const existingData = [];
+    if (worksheet.rowCount >= dataStartRow) {
+        for (let r = dataStartRow; r <= worksheet.rowCount; r++) {
+            const row = worksheet.getRow(r);
+            const rowData = {};
+            let hasVal = false;
+            headers.forEach((h, colIdx) => {
+                const cellVal = row.getCell(colIdx + 1).value;
+                if (cellVal !== undefined && cellVal !== null) {
+                    rowData[h] = typeof cellVal === 'object' && cellVal.text ? cellVal.text : cellVal.toString();
+                    if (rowData[h] !== '') hasVal = true;
+                } else {
+                    rowData[h] = '';
+                }
+            });
+            if (hasVal) {
+                existingData.push(rowData);
+            }
+        }
+    }
+
+    return {
+        headers,
+        existingData,
+        mappings,
+        savedUrls,
+        hasConfigSheet
+    };
 }
 
 /**
@@ -91,6 +319,7 @@ async function runCustomCrawl({
     containerSelector,
     mappings,
     excelTemplateBuffer,
+    existingData = [],
     jobDir,
     browserlessKey,
     updateProgress
@@ -397,6 +626,9 @@ async function runCustomCrawl({
         worksheet.addRow(headers);
     }
 
+    // Combine pre-existing dataset with newly crawled data
+    const fullDataSet = [...(existingData || []), ...crawledData];
+
     // Add extra headers for metadata if not present
     const updatedHeaders = [...headers];
     if (!updatedHeaders.includes('Page URL')) {
@@ -433,8 +665,8 @@ async function runCustomCrawl({
         };
     });
 
-    // Populate rows
-    crawledData.forEach((row, rIdx) => {
+    // Populate rows from fullDataSet (existing + new)
+    fullDataSet.forEach((row, rIdx) => {
         const rowValues = [];
         updatedHeaders.forEach(header => {
             rowValues.push(row[header] !== undefined ? row[header] : '');
@@ -470,6 +702,9 @@ async function runCustomCrawl({
         column.width = maxLen + 2;
     });
 
+    // Embed config settings sheet into workbook
+    appendCrawlConfigSheet(workbook, mappings, [url]);
+
     const excelFilename = `custom_crawled_data_${jobId.slice(0, 8)}.xlsx`;
     const excelPath = path.join(jobDir, excelFilename);
     await workbook.xlsx.writeFile(excelPath);
@@ -493,7 +728,7 @@ async function runCustomCrawl({
         excelPath,
         zipPath,
         headers: updatedHeaders,
-        data: crawledData
+        data: fullDataSet
     };
 }
 
@@ -620,5 +855,7 @@ async function extractCheerio(url, containerSelector, headers, mappings) {
 
 module.exports = {
     parseExcelHeaders,
+    parseExcelPackage,
+    appendCrawlConfigSheet,
     runCustomCrawl
 };

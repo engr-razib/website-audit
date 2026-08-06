@@ -7,7 +7,7 @@ const { chromium } = require('playwright');
 const { fetchSitemapUrls, crawlInternalUrls, auditSinglePage } = require('./services/siteCrawlerEngine');
 const { generateExcelReport } = require('./services/excelExportService');
 const { cleanOutputs } = require('./cleanup_outputs');
-const { parseExcelHeaders, runCustomCrawl } = require('./services/customCrawlerEngine');
+const { parseExcelHeaders, parseExcelPackage, appendCrawlConfigSheet, runCustomCrawl } = require('./services/customCrawlerEngine');
 
 // Run automatic output cleanup on server startup & schedule every 6 hours (cleaning files > 24 hours)
 cleanOutputs();
@@ -15,11 +15,13 @@ setInterval(() => {
     cleanOutputs();
 }, 6 * 60 * 60 * 1000).unref();
 
+const DEFAULT_BROWSERLESS_KEY = '2UyXC7OcLU2mwm77ae4b055adfcec31aa0333d1979976e9cb';
+
 // Mutable runtime API key — can be updated via POST /api/settings/browserless-key
-// NOTE: No hardcoded fallback key — in local development, leave BROWSERLESS_API_KEY unset
-// so local Playwright Chromium is used instead of calling Browserless.io.
-// Only set BROWSERLESS_API_KEY in your production environment.
-let BROWSERLESS_API_KEY = process.env.BROWSERLESS_API_KEY || '';
+// In live server (NODE_ENV === 'production'), Browserless.io API key is set by default.
+// In local development, leave BROWSERLESS_API_KEY unset so local Playwright Chromium is used instead.
+let BROWSERLESS_API_KEY = process.env.BROWSERLESS_API_KEY || (process.env.NODE_ENV === 'production' ? DEFAULT_BROWSERLESS_KEY : '');
+
 
 
 const app = express();
@@ -1125,7 +1127,7 @@ const customCrawlJobs = {};
  * Custom Crawler Endpoints
  */
 
-// 1. Parse Excel Headers
+// 1. Parse Excel Package (Headers, Existing Dataset, and embedded _CRAWL_CONFIG_ rules)
 app.post('/api/custom-crawler/parse-headers', async (req, res) => {
     const { fileBase64 } = req.body;
     if (!fileBase64) {
@@ -1134,8 +1136,14 @@ app.post('/api/custom-crawler/parse-headers', async (req, res) => {
 
     try {
         const fileBuffer = Buffer.from(fileBase64, 'base64');
-        const headers = await parseExcelHeaders(fileBuffer);
-        res.json({ headers });
+        const pkg = await parseExcelPackage(fileBuffer);
+        res.json({
+            headers: pkg.headers,
+            existingData: pkg.existingData,
+            mappings: pkg.mappings,
+            savedUrls: pkg.savedUrls,
+            hasConfigSheet: pkg.hasConfigSheet
+        });
     } catch (err) {
         console.error('[!] Failed to parse Excel template:', err.message);
         res.status(400).json({ error: err.message || 'Failed to parse Excel file headers' });
@@ -1170,8 +1178,8 @@ app.get('/api/custom-crawler/preview', async (req, res) => {
             console.log(`[!] Axios failed to fetch preview for ${url} (Status: ${err.response?.status}). Falling back to Playwright...`);
             let browser;
             try {
-                if (global.BROWSERLESS_API_KEY) {
-                    browser = await chromium.connectOverCDP(`wss://chrome.browserless.io?token=${global.BROWSERLESS_API_KEY}`);
+                if (BROWSERLESS_API_KEY) {
+                    browser = await chromium.connectOverCDP(`wss://chrome.browserless.io?token=${BROWSERLESS_API_KEY}`);
                 } else {
                     browser = await chromium.launch({ headless: true });
                 }
@@ -1303,8 +1311,8 @@ app.get('/api/custom-crawler/preview', async (req, res) => {
 
 // 2. Start Custom Crawling Job
 app.post('/api/custom-crawler/start', async (req, res) => {
-    // Accept both legacy `url` (string) and new `urls` (array) fields
-    let { url, urls, crawlOption = 'data', maxPages = 10, containerSelector, mappings, xlsxBase64 } = req.body;
+    // Accept both legacy `url` (string) and new `urls` (array) fields, plus existingData
+    let { url, urls, crawlOption = 'data', maxPages = 10, containerSelector, mappings, xlsxBase64, existingData = [] } = req.body;
 
     // Normalize to array
     if (!urls || !Array.isArray(urls) || urls.length === 0) {
@@ -1377,6 +1385,7 @@ app.post('/api/custom-crawler/start', async (req, res) => {
                     containerSelector,
                     mappings,
                     excelTemplateBuffer: excelBuffer,
+                    existingData: i === 0 ? existingData : [], // Pass existingData on first iteration
                     jobDir: subDir,
                     browserlessKey: BROWSERLESS_API_KEY,
                     updateProgress: (current, total, currentUrl, dataSoFar) => {
@@ -1426,6 +1435,9 @@ app.post('/api/custom-crawler/start', async (req, res) => {
 
                 // Auto column widths
                 ws.columns.forEach(col => { col.width = 30; });
+
+                // Append configuration settings sheet to merged workbook
+                appendCrawlConfigSheet(mergedWorkbook, mappings, urls);
 
                 const mergedExcelPath = path.join(jobDir, 'merged_crawl_output.xlsx');
                 await mergedWorkbook.xlsx.writeFile(mergedExcelPath);
@@ -1546,6 +1558,123 @@ app.get('/api/custom-crawler/jobs/:jobId/download/zip', (req, res) => {
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
 
     res.sendFile(path.resolve(job.zipPath));
+});
+
+// 6. Download Sample Custom Crawler Excel Template (with Crawled Data and Crawl Rules)
+app.get('/api/custom-crawler/download-sample-template', async (req, res) => {
+    try {
+        const ExcelJS = require('exceljs');
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'Website Audit Microservice API';
+
+        const headerStyle = {
+            fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F497D' } },
+            font: { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FFFFFFFF' } },
+            alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+            border: {
+                top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
+            }
+        };
+
+        // Sheet 1: Crawled Data
+        const dataSheet = workbook.addWorksheet('Crawled Data');
+        dataSheet.views = [{ state: 'frozen', ySplit: 1, showGridLines: true }];
+        
+        const dataHeaders = ['Product Title', 'Category', 'Read Time', 'Product Image', 'Page URL'];
+        const dHeaderRow = dataSheet.addRow(dataHeaders);
+        dHeaderRow.height = 28;
+        dHeaderRow.eachCell(cell => Object.assign(cell, headerStyle));
+
+        const sampleRows = [
+            ['Custom Crawler Guide', 'Documentation', '5 min read', 'https://audit.razib.bd/images/custom-crawl.png', 'https://audit.razib.bd/guides/custom-crawler'],
+            ['Font Audit Case Study', 'Case Study', '8 min read', 'https://audit.razib.bd/images/font-audit.png', 'https://audit.razib.bd/guides/font-audit'],
+            ['Image Scraper Tutorial', 'Tutorials', '4 min read', 'https://audit.razib.bd/images/image-scraper.png', 'https://audit.razib.bd/guides/image-scraper']
+        ];
+
+        sampleRows.forEach((rVals, idx) => {
+            const row = dataSheet.addRow(rVals);
+            row.height = 24;
+            const isEven = idx % 2 === 1;
+            const rowBgColor = isEven ? 'FFF2F5F9' : 'FFFFFFFF';
+            row.eachCell((cell, colNum) => {
+                cell.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF333333' } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBgColor } };
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                    left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                    bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+                    right: { style: 'thin', color: { argb: 'FFD9D9D9' } }
+                };
+                cell.alignment = { horizontal: colNum === 4 || colNum === 5 ? 'left' : 'center', vertical: 'middle' };
+            });
+        });
+
+        dataSheet.columns.forEach(col => { col.width = 30; });
+
+        // Sheet 2: Crawl Rules
+        const rulesSheet = workbook.addWorksheet('Crawl Rules');
+        rulesSheet.views = [{ showGridLines: true }];
+
+        const titleRow = rulesSheet.addRow(['Crawler Feature Rules & Selector Configuration', '', '', '', '']);
+        titleRow.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: 'FF1F497D' } };
+        rulesSheet.addRow([]);
+
+        const rHRow = rulesSheet.addRow(['Column Name', 'CSS Selector', 'Extract Type', 'Attribute Name', 'Domain Overrides']);
+        rHRow.height = 26;
+        rHRow.eachCell(cell => Object.assign(cell, headerStyle));
+
+        const sampleRules = [
+            ['Product Title', '[data-testid="guide-title"]', 'text', '', ''],
+            ['Category', '[data-testid="guide-category"]', 'text', '', ''],
+            ['Read Time', '[data-testid="guide-read-time"]', 'text', '', ''],
+            ['Product Image', '[data-testid="guide-card"] img', 'attr', 'src', JSON.stringify({ 'example.com': 'img.product-img' })]
+        ];
+
+        sampleRules.forEach(rVals => {
+            const row = rulesSheet.addRow(rVals);
+            row.height = 22;
+            row.eachCell((cell, cIdx) => {
+                cell.font = { name: 'Segoe UI', size: 10 };
+                cell.alignment = { horizontal: cIdx === 1 || cIdx === 2 ? 'left' : 'center', vertical: 'middle' };
+            });
+        });
+
+        rulesSheet.addRow([]);
+        const urlTitleRow = rulesSheet.addRow(['Starting URLs List', '', '', '', '']);
+        urlTitleRow.font = { name: 'Segoe UI', size: 12, bold: true, color: { argb: 'FF1F497D' } };
+        const demoUrls = ['https://audit.razib.bd/guides/'];
+        demoUrls.forEach(u => {
+            const uRow = rulesSheet.addRow([u]);
+            uRow.getCell(1).font = { name: 'Segoe UI', size: 10, color: { argb: 'FF2563EB' } };
+        });
+
+        rulesSheet.columns.forEach((col, idx) => {
+            col.width = idx === 0 ? 25 : idx === 1 ? 35 : idx === 4 ? 35 : 20;
+        });
+
+        // Sheet 3: _CRAWL_CONFIG_ (hidden)
+        const sampleMappings = {
+            'Product Title': { selector: '[data-testid="guide-title"]', type: 'text' },
+            'Category': { selector: '[data-testid="guide-category"]', type: 'text' },
+            'Read Time': { selector: '[data-testid="guide-read-time"]', type: 'text' },
+            'Product Image': { selector: '[data-testid="guide-card"] img', type: 'attr', attrName: 'src', domainOverrides: { 'example.com': 'img.product-img' } }
+        };
+        appendCrawlConfigSheet(workbook, sampleMappings, demoUrls);
+
+        const filename = 'sample_custom_crawl_template.xlsx';
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        res.send(buffer);
+    } catch (err) {
+        console.error('[!] Failed to generate sample Excel template:', err.message);
+        res.status(500).json({ error: 'Failed to generate sample Excel template' });
+    }
 });
 
 const server = app.listen(PORT, () => {
