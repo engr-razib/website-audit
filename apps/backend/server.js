@@ -1139,16 +1139,157 @@ app.post('/api/custom-crawler/parse-headers', async (req, res) => {
     }
 });
 
+// 1b. Visual Selector Preview Proxy
+// Fetches any URL server-side, rewrites relative paths, strips framing
+// restrictions, and injects a click-capture overlay so the iframe can
+// postMessage the picked CSS selector back to the parent.
+app.get('/api/custom-crawler/preview', async (req, res) => {
+    const { url } = req.query;
+    if (!url) return res.status(400).send('<h2>URL query param is required</h2>');
+
+    try {
+        const targetUrl = new URL(url);
+        const baseOrigin = targetUrl.origin;
+
+        const response = await axios.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+            },
+            timeout: 15000,
+            responseType: 'text',
+        });
+
+        let html = response.data;
+
+        // Add <base> tag so all relative paths resolve against the original origin
+        const baseTag = `<base href="${baseOrigin}/">`;
+        if (/<head[^>]*>/i.test(html)) {
+            html = html.replace(/<head[^>]*>/i, (m) => m + baseTag);
+        } else {
+            html = baseTag + html;
+        }
+
+        // Build the injected click-capture + highlight script
+        const injectScript = `
+<style>
+  #__audit_bar__ { position:fixed;bottom:0;left:0;right:0;z-index:2147483647;background:rgba(10,18,40,0.96);color:#93c5fd;padding:9px 16px;font-family:monospace;font-size:12px;border-top:2px solid #3b82f6;display:flex;gap:10px;align-items:center;pointer-events:none; }
+  #__audit_bar__ span.tip { color:#60a5fa;font-weight:bold;white-space:nowrap; }
+  #__audit_bar__ span.sel { flex:1;text-align:right;color:#a5f3fc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  #__audit_hl__ { position:fixed;pointer-events:none;z-index:2147483646;background:rgba(59,130,246,0.18);outline:2px solid #3b82f6;box-sizing:border-box; }
+</style>
+<script>
+(function(){
+  // Prevent navigation away from proxy page
+  document.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); }, true);
+  document.addEventListener('submit', function(e){ e.preventDefault(); }, true);
+
+  var hl = document.createElement('div');
+  hl.id = '__audit_hl__';
+  var bar = document.createElement('div');
+  bar.id = '__audit_bar__';
+  bar.innerHTML = '<span class="tip">🎯 Click any element to pick its selector</span><span class="sel" id="__audit_sel__"></span>';
+
+  function mount(){
+    if(document.body){
+      document.body.appendChild(hl);
+      document.body.appendChild(bar);
+    }
+  }
+  if(document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
+
+  function esc(s){ return typeof CSS!=='undefined'&&CSS.escape?CSS.escape(s):s.replace(/([\\!"#$%&'()*+,\\-./:;<=>?@[\\\\\\]^${'`'}{|}~])/g,'\\\\$1'); }
+
+  function getSelector(el){
+    if(!el||el===document.documentElement) return 'html';
+    if(el===document.body) return 'body';
+    if(el.id) return '#'+esc(el.id);
+    var tag=el.tagName.toLowerCase();
+    var cls='';
+    if(el.classList&&el.classList.length){
+      var good=Array.from(el.classList)
+        .filter(function(c){ return c.length>1&&!/^(active|hover|focus|open|show|hide|visible|hidden|selected|disabled|loading|is-|js-)/.test(c); })
+        .slice(0,3)
+        .map(function(c){ return '.'+esc(c); });
+      cls=good.join('');
+    }
+    var cand=tag+cls;
+    try{
+      if(cls&&document.querySelectorAll(cand).length===1) return cand;
+      if(cls&&document.querySelectorAll(cls).length===1) return cls;
+    }catch(e){}
+    var parent=el.parentElement;
+    if(parent){
+      var sibs=Array.from(parent.children).filter(function(c){ return c.tagName===el.tagName; });
+      var nth=sibs.length>1?':nth-of-type('+(sibs.indexOf(el)+1)+')':'';
+      return getSelector(parent)+' > '+tag+cls+nth;
+    }
+    return cand;
+  }
+
+  document.addEventListener('mouseover', function(e){
+    var r=e.target.getBoundingClientRect();
+    hl.style.top=(r.top+window.scrollY)+'px';
+    hl.style.left=(r.left+window.scrollX)+'px';
+    hl.style.width=r.width+'px';
+    hl.style.height=r.height+'px';
+    hl.style.display='block';
+    var sel=getSelector(e.target);
+    var s=document.getElementById('__audit_sel__');
+    if(s) s.textContent=sel;
+  }, true);
+
+  document.addEventListener('click', function(e){
+    e.preventDefault(); e.stopPropagation();
+    var el=e.target;
+    var sel=getSelector(el);
+    var tag=el.tagName.toLowerCase();
+    var attrHint=tag==='img'?'src':(tag==='a'?'href':'text');
+    window.parent.postMessage({ type:'SELECTOR_PICKED', selector:sel, tagName:tag, attrHint:attrHint }, '*');
+  }, true);
+})();
+</script>`;
+
+        if (/<\/body>/i.test(html)) {
+            html = html.replace(/<\/body>/i, injectScript + '</body>');
+        } else {
+            html += injectScript;
+        }
+
+        // Strip headers that block iframe embedding
+        res.removeHeader('X-Frame-Options');
+        res.removeHeader('Content-Security-Policy');
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.send(html);
+
+    } catch (err) {
+        const msg = err.message || 'Unknown error';
+        res.status(500).send(`<!DOCTYPE html><html><head><base href="/"></head><body style="margin:0;font-family:system-ui,sans-serif;background:#0f172a;color:#f1f5f9;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:1rem;padding:2rem;box-sizing:border-box;text-align:center"><div style="font-size:3rem">⚠️</div><h2 style="color:#f87171;margin:0">Could not load preview</h2><p style="color:#94a3b8;max-width:480px">${msg}</p><p style="color:#64748b;font-size:0.8rem">The site may block proxying. Try opening the URL in Chrome DevTools (F12 → Inspector) to find selectors manually.</p></body></html>`);
+    }
+});
+
 // 2. Start Custom Crawling Job
 app.post('/api/custom-crawler/start', async (req, res) => {
-    const { url, crawlOption = 'data', maxPages = 10, containerSelector, mappings, xlsxBase64 } = req.body;
+    // Accept both legacy `url` (string) and new `urls` (array) fields
+    let { url, urls, crawlOption = 'data', maxPages = 10, containerSelector, mappings, xlsxBase64 } = req.body;
 
-    if (!url) {
-        return res.status(400).json({ error: 'Starting URL is required' });
+    // Normalize to array
+    if (!urls || !Array.isArray(urls) || urls.length === 0) {
+        if (url) {
+            urls = [url];
+        } else {
+            return res.status(400).json({ error: 'At least one Starting URL is required (urls[] or url)' });
+        }
     }
-    if (!xlsxBase64) {
-        return res.status(400).json({ error: 'Excel template file (.xlsx) as base64 is required' });
+
+    // Trim & deduplicate
+    urls = Array.from(new Set(urls.map(u => u.trim()).filter(Boolean)));
+    if (urls.length === 0) {
+        return res.status(400).json({ error: 'No valid URLs provided.' });
     }
+
     if (!mappings || typeof mappings !== 'object') {
         return res.status(400).json({ error: 'Mappings configuration is required' });
     }
@@ -1157,11 +1298,13 @@ app.post('/api/custom-crawler/start', async (req, res) => {
     const jobDir = path.join(OUTPUTS_DIR, `custom-crawl-${jobId}`);
     fs.mkdirSync(jobDir, { recursive: true });
 
+    const totalUrls = urls.length;
+
     customCrawlJobs[jobId] = {
         jobId,
         status: 'pending',
         progress: { current: 0, total: 0, currentUrl: '', percent: 0 },
-        url,
+        urls,
         crawlOption,
         maxPages,
         createdAt: new Date().toISOString(),
@@ -1173,40 +1316,134 @@ app.post('/api/custom-crawler/start', async (req, res) => {
         error: null
     };
 
-    // Run asynchronously
+    // Run asynchronously — loop through all URLs
     (async () => {
         const job = customCrawlJobs[jobId];
         job.status = 'running';
 
         try {
-            const excelBuffer = Buffer.from(xlsxBase64, 'base64');
-            const result = await runCustomCrawl({
-                jobId,
-                url,
-                crawlOption,
-                maxPages: parseInt(maxPages) || 10,
-                containerSelector,
-                mappings,
-                excelTemplateBuffer: excelBuffer,
-                jobDir,
-                browserlessKey: BROWSERLESS_API_KEY,
-                updateProgress: (current, total, currentUrl, dataSoFar) => {
-                    job.progress = {
-                        current,
-                        total,
-                        currentUrl,
-                        percent: total > 0 ? Math.round((current / total) * 100) : 0
-                    };
-                    job.data = dataSoFar;
-                }
-            });
+            const excelBuffer = xlsxBase64 ? Buffer.from(xlsxBase64, 'base64') : null;
 
-            job.excelPath = result.excelPath;
-            job.zipPath = result.zipPath;
-            job.headers = result.headers;
-            job.data = result.data;
+            let mergedData = [];
+            let mergedHeaders = [];
+            let lastExcelPath = null;
+            let lastZipPath = null;
+
+            for (let i = 0; i < urls.length; i++) {
+                const targetUrl = urls[i];
+
+                // Create a sub-dir per URL to avoid image collisions
+                const subDir = path.join(jobDir, `url_${i + 1}`);
+                fs.mkdirSync(subDir, { recursive: true });
+
+                console.log(`[+] Custom crawl job ${jobId}: Processing URL ${i + 1}/${urls.length}: ${targetUrl}`);
+
+                const result = await runCustomCrawl({
+                    jobId,
+                    url: targetUrl,
+                    crawlOption,
+                    maxPages: parseInt(maxPages) || 10,
+                    containerSelector,
+                    mappings,
+                    excelTemplateBuffer: excelBuffer,
+                    jobDir: subDir,
+                    browserlessKey: BROWSERLESS_API_KEY,
+                    updateProgress: (current, total, currentUrl, dataSoFar) => {
+                        // Combine per-URL progress into overall progress
+                        const urlsDone = i;
+                        const overallCurrent = urlsDone * (total || 1) + current;
+                        const overallTotal = totalUrls * (total || 1);
+                        job.progress = {
+                            current: overallCurrent,
+                            total: overallTotal,
+                            currentUrl: `[URL ${i + 1}/${totalUrls}] ${currentUrl}`,
+                            percent: overallTotal > 0 ? Math.round((overallCurrent / overallTotal) * 100) : 0
+                        };
+                        // Merge live preview data
+                        job.data = [...mergedData, ...dataSoFar];
+                    }
+                });
+
+                if (mergedHeaders.length === 0) {
+                    mergedHeaders = result.headers;
+                }
+                mergedData = [...mergedData, ...result.data];
+                lastExcelPath = result.excelPath;
+                if (result.zipPath) lastZipPath = result.zipPath;
+            }
+
+            // If more than 1 URL was crawled, re-write a merged Excel from all data
+            if (urls.length > 1 && mergedData.length > 0) {
+                const ExcelJS = require('exceljs');
+                const mergedWorkbook = new ExcelJS.Workbook();
+                const ws = mergedWorkbook.addWorksheet('Crawled Data');
+
+                // Write headers
+                const allHeaders = mergedHeaders.includes('Page URL') 
+                    ? mergedHeaders 
+                    : ['Page URL', ...mergedHeaders];
+                ws.addRow(allHeaders);
+                ws.getRow(1).font = { bold: true };
+                ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1565C0' } };
+                ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+                // Write data rows
+                mergedData.forEach(row => {
+                    const rowArr = allHeaders.map(h => row[h] || '');
+                    ws.addRow(rowArr);
+                });
+
+                // Auto column widths
+                ws.columns.forEach(col => { col.width = 30; });
+
+                const mergedExcelPath = path.join(jobDir, 'merged_crawl_output.xlsx');
+                await mergedWorkbook.xlsx.writeFile(mergedExcelPath);
+                lastExcelPath = mergedExcelPath;
+                console.log(`[+] Custom crawl job ${jobId}: Merged Excel written with ${mergedData.length} total rows.`);
+            }
+
+            // If data-and-images option was selected, pack the final ZIP containing the merged Excel and all images
+            if (crawlOption === 'data-and-images' && lastExcelPath) {
+                const AdmZip = require('adm-zip');
+                const zip = new AdmZip();
+                
+                // Add the final merged Excel report at zip root
+                zip.addLocalFile(lastExcelPath);
+                
+                // Add images from all crawled URLs to avoid collision
+                for (let i = 0; i < urls.length; i++) {
+                    const subDir = path.join(jobDir, `url_${i + 1}`);
+                    const subImagesDir = path.join(subDir, 'images');
+                    if (fs.existsSync(subImagesDir)) {
+                        const files = fs.readdirSync(subImagesDir);
+                        files.forEach(file => {
+                            const filePath = path.join(subImagesDir, file);
+                            // Prefix to guarantee uniqueness inside zip folder
+                            const zipFilename = `url_${i + 1}_${file}`;
+                            zip.addLocalFile(filePath, 'images', zipFilename);
+                        });
+                    }
+                }
+                
+                const zipFilename = `custom_crawl_${jobId.slice(0, 8)}.zip`;
+                const finalZipPath = path.join(jobDir, zipFilename);
+                zip.writeZip(finalZipPath);
+                lastZipPath = finalZipPath;
+                console.log(`[+] Custom crawl job ${jobId}: Final unified ZIP written to ${finalZipPath}`);
+            }
+
+            job.excelPath = lastExcelPath;
+            job.zipPath = lastZipPath;
+            job.headers = mergedHeaders;
+            job.data = mergedData;
             job.status = 'completed';
             job.completedAt = new Date().toISOString();
+            job.progress = {
+                current: mergedData.length,
+                total: mergedData.length,
+                currentUrl: `All ${totalUrls} URL(s) completed`,
+                percent: 100
+            };
         } catch (err) {
             console.error(`[!] Custom crawl job ${jobId} failed:`, err);
             job.status = 'failed';

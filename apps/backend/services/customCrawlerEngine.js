@@ -100,8 +100,18 @@ async function runCustomCrawl({
         fs.mkdirSync(imagesDir, { recursive: true });
     }
 
-    // 1. Parse excel headers
-    const headers = await parseExcelHeaders(excelTemplateBuffer);
+    // 1. Parse headers (fallback to mappings keys if no Excel template buffer is provided)
+    let headers;
+    if (excelTemplateBuffer) {
+        try {
+            headers = await parseExcelHeaders(excelTemplateBuffer);
+        } catch (e) {
+            console.warn('[!] Failed to parse Excel buffer headers, falling back to mappings:', e.message);
+            headers = Object.keys(mappings);
+        }
+    } else {
+        headers = Object.keys(mappings);
+    }
     
     // Check robots.txt compliance for starting URL
     const allowed = await isUrlAllowed(url, 'AuditBot');
@@ -144,18 +154,8 @@ async function runCustomCrawl({
         }
     }
 
-    // 3. Resolve pages to crawl
+    // 3. Resolve pages to crawl (Only crawl the user-specified URLs, do not fetch internal pages)
     let urlsToCrawl = [url];
-    if (maxPages > 1) {
-        try {
-            urlsToCrawl = await crawlInternalUrls(browser, url, maxPages);
-        } catch (err) {
-            console.error('[!] Crawl internal URLs failed:', err.message);
-        }
-    }
-    
-    // Ensure starting URL is first
-    urlsToCrawl = Array.from(new Set([url, ...urlsToCrawl])).slice(0, maxPages);
     
     const crawledData = [];
     const imageDownloadQueue = [];
@@ -238,26 +238,47 @@ async function runCustomCrawl({
                     const items = [];
                     const containers = containerSelector ? document.querySelectorAll(containerSelector) : [document.body];
                     
+                    // Helper to get hostname from URL
+                    let hostname = '';
+                    try {
+                        hostname = new URL(currentUrl).hostname.toLowerCase();
+                    } catch (e) {}
+
                     containers.forEach(container => {
                         const row = {};
                         row['Page URL'] = currentUrl;
                         
                         headers.forEach(header => {
                             const mapping = mappings[header];
-                            if (mapping && mapping.selector) {
-                                const cellEl = container.querySelector(mapping.selector);
-                                if (cellEl) {
-                                    if (mapping.type === 'text') {
-                                        row[header] = cellEl.textContent.trim();
-                                    } else if (mapping.type === 'attr' && mapping.attrName) {
-                                        // Resolve relative URLs in browser
-                                        if (mapping.attrName === 'src' && cellEl.src) {
-                                            row[header] = cellEl.src;
-                                        } else if (mapping.attrName === 'href' && cellEl.href) {
-                                            row[header] = cellEl.href;
-                                        } else {
-                                            row[header] = cellEl.getAttribute(mapping.attrName) || '';
+                            if (mapping) {
+                                // Resolve domain override if present
+                                let selector = mapping.selector;
+                                if (mapping.domainOverrides && hostname) {
+                                    for (const dom of Object.keys(mapping.domainOverrides)) {
+                                        if (hostname.includes(dom.toLowerCase())) {
+                                            selector = mapping.domainOverrides[dom];
+                                            break;
                                         }
+                                    }
+                                }
+
+                                if (selector) {
+                                    const cellEl = container.querySelector(selector);
+                                    if (cellEl) {
+                                        if (mapping.type === 'text') {
+                                            row[header] = cellEl.textContent.trim();
+                                        } else if (mapping.type === 'attr' && mapping.attrName) {
+                                            // Resolve relative URLs in browser
+                                            if (mapping.attrName === 'src' && cellEl.src) {
+                                                row[header] = cellEl.src;
+                                            } else if (mapping.attrName === 'href' && cellEl.href) {
+                                                row[header] = cellEl.href;
+                                            } else {
+                                                row[header] = cellEl.getAttribute(mapping.attrName) || '';
+                                            }
+                                        }
+                                    } else {
+                                        row[header] = '';
                                     }
                                 } else {
                                     row[header] = '';
@@ -362,12 +383,18 @@ async function runCustomCrawl({
 
     // 7. Write to Excel file
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(excelTemplateBuffer);
-    const worksheet = workbook.worksheets[0];
-    
-    // Clear rows below headers
-    while (worksheet.rowCount > 1) {
-        worksheet.removeRow(2);
+    let worksheet;
+    if (excelTemplateBuffer) {
+        await workbook.xlsx.load(excelTemplateBuffer);
+        worksheet = workbook.worksheets[0];
+        // Clear rows below headers
+        while (worksheet.rowCount > 1) {
+            worksheet.removeRow(2);
+        }
+    } else {
+        worksheet = workbook.addWorksheet('Crawled Data');
+        // Write the header row
+        worksheet.addRow(headers);
     }
 
     // Add extra headers for metadata if not present
@@ -496,6 +523,11 @@ async function extractCheerio(url, containerSelector, headers, mappings) {
             }
         };
 
+        let hostname = '';
+        try {
+            hostname = new URL(url).hostname.toLowerCase();
+        } catch (e) {}
+
         if (containerSelector) {
             containers.each((idx, el) => {
                 const row = {};
@@ -503,17 +535,31 @@ async function extractCheerio(url, containerSelector, headers, mappings) {
                 
                 headers.forEach(header => {
                     const mapping = mappings[header];
-                    if (mapping && mapping.selector) {
-                        const cellEl = $(el).find(mapping.selector);
-                        if (cellEl.length > 0) {
-                            if (mapping.type === 'text') {
-                                row[header] = cellEl.text().trim();
-                            } else if (mapping.type === 'attr' && mapping.attrName) {
-                                let attrVal = cellEl.attr(mapping.attrName) || '';
-                                if (mapping.attrName === 'src' || mapping.attrName === 'href') {
-                                    attrVal = absoluteUrl(attrVal);
+                    if (mapping) {
+                        let selector = mapping.selector;
+                        if (mapping.domainOverrides && hostname) {
+                            for (const dom of Object.keys(mapping.domainOverrides)) {
+                                if (hostname.includes(dom.toLowerCase())) {
+                                    selector = mapping.domainOverrides[dom];
+                                    break;
                                 }
-                                row[header] = attrVal;
+                            }
+                        }
+
+                        if (selector) {
+                            const cellEl = $(el).find(selector);
+                            if (cellEl.length > 0) {
+                                if (mapping.type === 'text') {
+                                    row[header] = cellEl.text().trim();
+                                } else if (mapping.type === 'attr' && mapping.attrName) {
+                                    let attrVal = cellEl.attr(mapping.attrName) || '';
+                                    if (mapping.attrName === 'src' || mapping.attrName === 'href') {
+                                        attrVal = absoluteUrl(attrVal);
+                                    }
+                                    row[header] = attrVal;
+                                }
+                            } else {
+                                row[header] = '';
                             }
                         } else {
                             row[header] = '';
@@ -530,17 +576,31 @@ async function extractCheerio(url, containerSelector, headers, mappings) {
             row['Page URL'] = url;
             headers.forEach(header => {
                 const mapping = mappings[header];
-                if (mapping && mapping.selector) {
-                    const cellEl = $(mapping.selector);
-                    if (cellEl.length > 0) {
-                        if (mapping.type === 'text') {
-                            row[header] = cellEl.text().trim();
-                        } else if (mapping.type === 'attr' && mapping.attrName) {
-                            let attrVal = cellEl.attr(mapping.attrName) || '';
-                            if (mapping.attrName === 'src' || mapping.attrName === 'href') {
-                                attrVal = absoluteUrl(attrVal);
+                if (mapping) {
+                    let selector = mapping.selector;
+                    if (mapping.domainOverrides && hostname) {
+                        for (const dom of Object.keys(mapping.domainOverrides)) {
+                            if (hostname.includes(dom.toLowerCase())) {
+                                selector = mapping.domainOverrides[dom];
+                                break;
                             }
-                            row[header] = attrVal;
+                        }
+                    }
+
+                    if (selector) {
+                        const cellEl = $(selector);
+                        if (cellEl.length > 0) {
+                            if (mapping.type === 'text') {
+                                    row[header] = cellEl.text().trim();
+                            } else if (mapping.type === 'attr' && mapping.attrName) {
+                                let attrVal = cellEl.attr(mapping.attrName) || '';
+                                if (mapping.attrName === 'src' || mapping.attrName === 'href') {
+                                    attrVal = absoluteUrl(attrVal);
+                                }
+                                row[header] = attrVal;
+                            }
+                        } else {
+                            row[header] = '';
                         }
                     } else {
                         row[header] = '';

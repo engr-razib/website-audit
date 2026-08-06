@@ -331,15 +331,16 @@ export interface CustomCrawlMapping {
   selector: string;
   type: 'text' | 'attr';
   attrName?: string;
+  domainOverrides?: Record<string, string>;
 }
 
 export interface CustomCrawlRequest {
-  url: string;
+  urls: string[];
   crawlOption: 'data' | 'data-and-images';
   maxPages: number;
   containerSelector?: string;
   mappings: Record<string, CustomCrawlMapping>;
-  xlsxBase64: string;
+  xlsxBase64?: string;
 }
 
 export interface CustomCrawlJobStatus {
